@@ -1,0 +1,99 @@
+@extends('layouts.market')
+
+@section('content')
+<h1 class="text-2xl font-black mb-4">Tambah Produk</h1>
+
+<div class="bg-white border rounded-2xl p-5">
+    {{-- Tampilkan error validasi --}}
+    @if ($errors->any())
+        <div class="mb-4 p-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700">
+            <ul class="list-disc pl-5 space-y-1">
+                @foreach ($errors->all() as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('seller.products.store') }}" enctype="multipart/form-data" class="space-y-4">
+        @csrf
+
+        <div>
+            <label class="font-semibold">Nama</label>
+            <input name="name" value="{{ old('name') }}" class="w-full rounded-xl border-slate-200" required>
+        </div>
+
+        <div>
+            <label class="font-semibold">Kategori</label>
+            <select name="category_id" class="w-full rounded-xl border-slate-200">
+                <option value="">-</option>
+                @foreach($categories as $c)
+                    <option value="{{ $c->id }}" @selected(old('category_id') == $c->id)>{{ $c->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-semibold">Harga (Rp)</label>
+                <input type="number" min="0" name="price" value="{{ old('price') }}" class="w-full rounded-xl border-slate-200" required>
+            </div>
+
+            <div>
+                <label class="font-semibold">Stok</label>
+                <input type="number" min="0" name="stock" value="{{ old('stock') }}" class="w-full rounded-xl border-slate-200" required>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-semibold">Diskon</label>
+                <select name="discount_type" class="w-full rounded-xl border-slate-200">
+                    <option value="none" @selected(old('discount_type','none')==='none')>Tidak ada</option>
+                    <option value="percent" @selected(old('discount_type')==='percent')>Persen (%)</option>
+                    <option value="amount" @selected(old('discount_type')==='amount')>Potongan (Rp)</option>
+                </select>
+                <div class="text-xs text-slate-500 mt-1">Atur diskon per produk (Shopee-style). Jika tidak ada diskon pilih “Tidak ada”.</div>
+            </div>
+            <div>
+                <label class="font-semibold">Nilai Diskon</label>
+                <input type="number" min="0" name="discount_value" value="{{ old('discount_value',0) }}" class="w-full rounded-xl border-slate-200">
+                <div class="text-xs text-slate-500 mt-1">Contoh: 10 untuk 10% atau 5000 untuk potongan Rp 5.000.</div>
+            </div>
+        </div>
+
+        {{-- ✅ Tambahkan field berat --}}
+        <div>
+            <label class="font-semibold">Berat (gram)</label>
+            <input
+                type="number"
+                min="1"
+                name="weight_grams"
+                value="{{ old('weight_grams') }}"
+                class="w-full rounded-xl border-slate-200"
+                required
+            >
+            @error('weight_grams')
+                <div class="mt-1 text-sm text-rose-600">{{ $message }}</div>
+            @enderror
+        </div>
+
+        <div>
+            <label class="font-semibold">Deskripsi</label>
+            <textarea name="description" rows="4" class="w-full rounded-xl border-slate-200">{{ old('description') }}</textarea>
+        </div>
+
+        <div>
+            <label class="font-semibold">Gambar (opsional, bisa banyak)</label>
+            <input type="file" name="images[]" multiple class="w-full">
+        </div>
+
+        <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="is_active" value="1" {{ old('is_active', '1') ? 'checked' : '' }}>
+            <span class="font-semibold">Aktif</span>
+        </label>
+
+        <button class="w-full px-4 py-3 rounded-xl bg-rose-600 text-white font-black">Simpan</button>
+    </form>
+</div>
+@endsection

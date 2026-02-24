@@ -1,0 +1,103 @@
+@extends('layouts.market')
+
+@section('content')
+<h1 class="text-2xl font-black mb-4">Edit Produk</h1>
+
+<div class="bg-white border rounded-2xl p-5">
+    <form method="POST" action="{{ route('seller.products.update',$product) }}" enctype="multipart/form-data" class="space-y-4">
+        @csrf @method('PUT')
+        <div>
+            <label class="font-semibold">Nama</label>
+            <input name="name" value="{{ $product->name }}" class="w-full rounded-xl border-slate-200" required>
+        </div>
+
+        <div>
+            <label class="font-semibold">Kategori</label>
+            <select name="category_id" class="w-full rounded-xl border-slate-200">
+                <option value="">-</option>
+                @foreach($categories as $c)
+                    <option value="{{ $c->id }}" @selected($product->category_id===$c->id)>{{ $c->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-semibold">Harga</label>
+                <input type="number" min="0" name="price" value="{{ $product->price }}" class="w-full rounded-xl border-slate-200" required>
+            </div>
+            <div>
+                <label class="font-semibold">Stok</label>
+                <input type="number" min="0" name="stock" value="{{ $product->stock }}" class="w-full rounded-xl border-slate-200" required>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-semibold">Diskon</label>
+                <select name="discount_type" class="w-full rounded-xl border-slate-200">
+                    <option value="none" @selected(($product->discount_type ?? 'none')==='none')>Tidak ada</option>
+                    <option value="percent" @selected(($product->discount_type ?? '')==='percent')>Persen (%)</option>
+                    <option value="amount" @selected(($product->discount_type ?? '')==='amount')>Potongan (Rp)</option>
+                </select>
+                <div class="text-xs text-slate-500 mt-1">Diskon per produk. Contoh: 10% atau potongan Rp.</div>
+            </div>
+            <div>
+                <label class="font-semibold">Nilai Diskon</label>
+                <input type="number" min="0" name="discount_value" value="{{ (int)($product->discount_value ?? 0) }}" class="w-full rounded-xl border-slate-200">
+            </div>
+        </div>
+        <div>
+            <label class="font-semibold">Berat (gram)</label>
+            <input
+                type="number"
+                min="1"
+                name="weight_grams"
+                value="{{ old('weight_grams', $product->weight_grams) }}"
+                class="w-full rounded-xl border-slate-200"
+                required
+            >
+            @error('weight_grams')
+                <div class="mt-1 text-sm text-rose-600">{{ $message }}</div>
+            @enderror
+        </div>
+
+        <div>
+            <label class="font-semibold">Deskripsi</label>
+            <textarea name="description" rows="4" class="w-full rounded-xl border-slate-200">{{ $product->description }}</textarea>
+        </div>
+
+        <div>
+            <label class="font-semibold">Tambah gambar (opsional)</label>
+            <input type="file" name="images[]" multiple class="w-full">
+        </div>
+
+        @if($product->images->count())
+            <div>
+                <div class="font-semibold mb-2">Gambar Produk</div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    @foreach($product->images->sortBy('sort_order') as $img)
+                        <div class="relative">
+                            <img class="rounded-xl border object-cover aspect-square w-full" src="{{ asset('storage/'.$img->path) }}" alt="">
+                            <form method="POST" action="{{ route('seller.products.images.destroy', [$product, $img]) }}" class="absolute top-1 right-1">
+                                @csrf @method('DELETE')
+                                <button class="px-2 py-1 rounded-lg bg-white/90 border text-slate-700 hover:bg-white" title="Hapus">
+                                    ✕
+                                </button>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="text-xs text-slate-500 mt-2">*Gambar pertama otomatis jadi thumbnail utama.</div>
+            </div>
+        @endif
+
+        <label class="inline-flex items-center gap-2">
+            <input type="checkbox" name="is_active" value="1" @checked($product->is_active)>
+            <span class="font-semibold">Aktif</span>
+        </label>
+
+        <button class="w-full px-4 py-3 rounded-xl bg-slate-900 text-white font-black">Update</button>
+    </form>
+</div>
+@endsection
