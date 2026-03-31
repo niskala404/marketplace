@@ -105,3 +105,16 @@ Alpine.start();
     if (q.length >= 2 && list.innerHTML.trim() !== '') show();
   });
 })();
+async function enablePushNotifications() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const reg = await navigator.serviceWorker.register('/sw.js');
+
+    // Jika pakai FCM / VAPID, di sini baru buat subscription/token
+    console.log('Service worker ready:', reg);
+}
+
+window.addEventListener('load', enablePushNotifications);

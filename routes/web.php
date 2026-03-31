@@ -244,7 +244,15 @@ Route::delete('/flash-sales/{flash_sale}/items/{item}', [FlashSaleController::cl
         Route::post('/kyc/{kyc}/decide', [AdminKyc::class, 'decide'])->name('kyc.decide');
     });
 });
+Route::get('/notifications/check', function () {
+    if (!auth()->check()) {
+        return response()->json(['count' => 0]);
+    }
 
+    return response()->json([
+        'count' => auth()->user()->unreadNotifications()->count(),
+    ]);
+})->name('notifications.check');
 
 Route::middleware(['auth'])->get('/dashboard', function () {
     $user = auth()->user();

@@ -39,7 +39,7 @@ class OrderController extends Controller
         if ($request->status === 'shipped') {
             if ($request->filled('tracking_no')) {
                 $payload['tracking_no'] = $request->tracking_no;
-                $payload['tracking_number'] = $request->tracking_no;
+                
             }
             $payload['shipped_at'] = now();
         }

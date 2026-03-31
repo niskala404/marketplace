@@ -15,6 +15,9 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
+        <audio id="notifSound" preload="auto">
+    <source src="{{ asset('sounds/notification.mp3') }}" type="audio/mpeg">
+</audio>
         <div class="min-h-screen bg-gray-100">
             @include('layouts.navigation')
 
