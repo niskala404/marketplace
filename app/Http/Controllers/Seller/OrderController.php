@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Notifications\OrderDeliveredNotification;
 use App\Notifications\OrderStatusChangedNotification;
+use App\Services\OrderTrackingMilestoneService;
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -24,7 +25,7 @@ class OrderController extends Controller
         return view('seller.orders.show', compact('order'));
     }
 
-    public function updateStatus(Request $request, Order $order)
+    public function updateStatus(Request $request, Order $order, OrderTrackingMilestoneService $trackingMilestones)
     {
         abort_if($order->shop_id !== auth()->user()->shop->id, 403);
 
@@ -66,7 +67,8 @@ class OrderController extends Controller
             }
             if ($order->status === 'shipped') {
                 $desc = $order->tracking_no ? ('Nomor resi: '.$order->tracking_no) : null;
-                $order->logShipmentEvent('shipped', 'Pesanan dikirim', $desc);
+                $order->logShipmentEvent('shipped', 'Pesanan dikirim', $desc, now(), 'shipped');
+                $trackingMilestones->seedShippedMilestones($order);
             }
             if ($order->status === 'completed') {
                 $order->logShipmentEvent('completed', 'Pesanan selesai', 'Dana diproses ke penjual.');
@@ -99,7 +101,7 @@ class OrderController extends Controller
         if (!$order->delivered_at) {
             $order->update(['delivered_at' => now()]);
 
-            $order->logShipmentEvent('delivered', 'Pesanan sampai', 'Paket sudah sampai di alamat tujuan.');
+            $order->logShipmentEvent('delivered', 'Pesanan sampai', 'Paket sudah sampai di alamat tujuan.', now(), 'delivered');
 
             // notify buyer about delivery milestone
             $order->loadMissing('user');
@@ -109,5 +111,28 @@ class OrderController extends Controller
         }
 
         return back()->with('success', 'Pesanan ditandai sudah sampai (delivered).');
+    }
+
+    public function addCheckpoint(Request $request, Order $order)
+    {
+        abort_if($order->shop_id !== auth()->user()->shop->id, 403);
+        abort_if(!in_array($order->status, ['shipped', 'completed'], true), 422);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'location' => ['required', 'string', 'max:160'],
+        ]);
+
+        $order->logShipmentEvent(
+            'shipped',
+            $data['title'],
+            $data['description'] ?? null,
+            now(),
+            'custom_checkpoint',
+            $data['location']
+        );
+
+        return back()->with('success', 'Checkpoint tracking berhasil ditambahkan.');
     }
 }

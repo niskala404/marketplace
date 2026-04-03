@@ -13,12 +13,30 @@
         ])->filter()->map(function ($e) {
             return (object)[
                 'status' => $e['status'],
+                'event_code' => $e['status'],
                 'title' => $e['title'],
                 'description' => $e['desc'],
+                'location' => null,
                 'happened_at' => $e['at'],
             ];
         });
     }
+
+    $iconByCode = [
+        'order_created' => 'check',
+        'paid' => 'check',
+        'processing' => 'package',
+        'shipped' => 'truck',
+        'warehouse_received' => 'package',
+        'sorting_center' => 'package',
+        'line_haul' => 'truck',
+        'destination_dc' => 'package',
+        'courier_delivery' => 'truck',
+        'delivered' => 'map-pin',
+        'received' => 'check',
+        'completed' => 'check',
+        'cancelled' => 'circle-x',
+    ];
 @endphp
 
 <div class="bg-white border rounded-2xl p-5">
@@ -37,13 +55,16 @@
                 @foreach($events as $ev)
                     <li class="mb-6 ms-6">
                         <span class="absolute -start-3 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow">
-                            <x-ic name="check" class="w-4 h-4" />
+                            <x-ic :name="$iconByCode[$ev->event_code ?? $ev->status] ?? 'check'" class="w-4 h-4" />
                         </span>
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <div class="font-semibold text-slate-900">{{ $ev->title }}</div>
                                 @if($ev->description)
                                     <div class="text-sm text-slate-600 mt-0.5">{{ $ev->description }}</div>
+                                @endif
+                                @if(!empty($ev->location))
+                                    <div class="text-xs text-slate-500 mt-1">📍 {{ $ev->location }}</div>
                                 @endif
                             </div>
                             <div class="text-xs text-slate-500 whitespace-nowrap">

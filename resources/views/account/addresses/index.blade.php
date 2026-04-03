@@ -27,7 +27,16 @@
                         </div>
                         <div class="mt-1 text-slate-700 font-semibold">{{ $a->recipient_name }} ({{ $a->phone }})</div>
                         <div class="text-sm text-slate-600 mt-1">{{ $a->full_address }}</div>
-                        <div class="text-sm text-slate-500">{{ $a->district }} {{ $a->city }} {{ $a->province }} {{ $a->postal_code }}</div>
+                        @if($a->detail_address)
+                            <div class="text-sm text-slate-500 mt-1">Patokan: {{ $a->detail_address }}</div>
+                        @endif
+                        <div class="text-sm text-slate-500">{{ $a->village }} {{ $a->district }} {{ $a->city }} {{ $a->province }} {{ $a->postal_code }}</div>
+                        @if($a->latitude && $a->longitude)
+                            <a target="_blank" rel="noopener" class="inline-block mt-2 text-sm text-rose-600 font-semibold hover:underline"
+                               href="https://www.google.com/maps?q={{ $a->latitude }},{{ $a->longitude }}">
+                                Lihat titik lokasi
+                            </a>
+                        @endif
                     </div>
 
                     <div class="flex flex-col gap-2 w-40">
