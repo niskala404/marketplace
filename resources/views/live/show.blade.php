@@ -26,15 +26,7 @@
           <div>
             <div class="text-sm font-semibold line-clamp-2">{{ $p->name }}</div>
             <div class="text-rose-600 font-bold">Rp {{ number_format($p->price,0,',','.') }}</div>
-            @auth
-              <form method="POST" action="{{ route('cart.add', $p->id) }}" class="mt-1">
-                @csrf
-                <input type="hidden" name="qty" value="1">
-                <button class="text-xs px-2 py-1 rounded-full bg-rose-600 text-white">+ Keranjang</button>
-              </form>
-            @else
-              <span class="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-rose-600 text-white">Beli Sekarang</span>
-            @endauth
+
           </div>
         </a>
       @empty
@@ -43,9 +35,5 @@
     </div>
   </div>
 </div>
-@auth
-  <div class="fixed bottom-4 right-4 z-40">
-    <a href="{{ route('cart.index') }}" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-bold shadow-lg">Lihat Keranjang</a>
-  </div>
-@endauth
+
 @endsection

@@ -59,9 +59,7 @@ class WishlistController extends Controller
         if (!$product->is_active || $product->stock < 1) {
             return back()->with('error', 'Produk tidak tersedia atau stok habis.');
         }
-        if ($product->variants()->exists()) {
-            return back()->with('error', 'Produk ini punya varian. Silakan pilih varian di halaman produk.');
-        }
+
 
         DB::transaction(function () use ($user, $product, $wishlistItem) {
             $cart = Cart::firstOrCreate(['user_id' => $user->id]);
@@ -105,10 +103,7 @@ class WishlistController extends Controller
                     $skipped++;
                     continue;
                 }
-                if ($product->variants()->exists()) {
-                    $skipped++;
-                    continue;
-                }
+
 
                 $cartItem = CartItem::firstOrCreate([
                     'cart_id' => $cart->id,

@@ -7,8 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
-use App\Models\ProductVariantItem;
-use App\Models\ProductVariantOption;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -97,13 +96,12 @@ class ProductController extends Controller
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
             'variants' => ['nullable', 'array'],
-            'variant_options' => ['nullable', 'array'],
-            'variant_options.*' => ['nullable', 'string', 'max:80'],
+
             'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
             'variants.*.sku' => ['nullable', 'string', 'max:60'],
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
-            'variants.*.attributes' => ['nullable', 'string'],
+
         ]);
 
         $slug = Str::slug($data['name']);
@@ -141,12 +139,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants(
-                $product,
-                $data['variants'] ?? [],
-                $request->has('variants'),
-                $data['variant_options'] ?? []
-            );
+
         });
 
         return redirect()->route('seller.products.index')->with('success', 'Produk dibuat.');
@@ -176,14 +169,13 @@ class ProductController extends Controller
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
             'variants' => ['nullable', 'array'],
-            'variant_options' => ['nullable', 'array'],
-            'variant_options.*' => ['nullable', 'string', 'max:80'],
+
             'variants.*.id' => ['nullable', 'integer'],
             'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
             'variants.*.sku' => ['nullable', 'string', 'max:60'],
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
-            'variants.*.attributes' => ['nullable', 'string'],
+
         ]);
 
         DB::transaction(function () use ($request, $product, $data) {
@@ -216,12 +208,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants(
-                $product,
-                $data['variants'] ?? [],
-                $request->has('variants'),
-                $data['variant_options'] ?? []
-            );
+
         });
 
         return back()->with('success', 'Produk diperbarui.');
@@ -240,12 +227,7 @@ class ProductController extends Controller
         return back()->with('success', 'Produk dihapus.');
     }
 
-    private function syncInlineVariants(
-        Product $product,
-        array $variants,
-        bool $variantsPayloadExists = false,
-        array $variantOptions = []
-    ): void
+
     {
         $variants = collect($variants)
             ->filter(fn ($row) => trim((string) ($row['name'] ?? '')) !== '')
@@ -254,39 +236,12 @@ class ProductController extends Controller
         if ($variants->isEmpty()) {
             if ($variantsPayloadExists) {
                 $product->variants()->delete();
-                $product->variantOptions()->delete();
+
             }
             return;
         }
 
         $keepIds = [];
-        $optionNames = collect($variantOptions)
-            ->map(fn ($v) => trim((string) $v))
-            ->filter()
-            ->values();
-
-        foreach ($variants as $row) {
-            $attrs = json_decode((string)($row['attributes'] ?? ''), true);
-            if (is_array($attrs)) {
-                foreach (array_keys($attrs) as $k) {
-                    $k = trim((string)$k);
-                    if ($k !== '' && !$optionNames->contains($k)) {
-                        $optionNames->push($k);
-                    }
-                }
-            }
-        }
-
-        $product->variantOptions()->delete();
-        $optionMap = [];
-        foreach ($optionNames->values() as $idx => $name) {
-            $opt = ProductVariantOption::create([
-                'product_id' => $product->id,
-                'name' => $name,
-                'sort_order' => $idx,
-            ]);
-            $optionMap[$name] = $opt;
-        }
 
         foreach ($variants as $row) {
             $variant = null;
@@ -306,24 +261,7 @@ class ProductController extends Controller
                 'is_active' => true,
             ]);
             $variant->save();
-            $variant->items()->delete();
 
-            $attrs = json_decode((string)($row['attributes'] ?? ''), true);
-            if (is_array($attrs)) {
-                foreach ($attrs as $optionName => $value) {
-                    $optionName = trim((string) $optionName);
-                    $value = trim((string) $value);
-                    $option = $optionMap[$optionName] ?? null;
-                    if (!$option || $value === '') {
-                        continue;
-                    }
-                    ProductVariantItem::create([
-                        'product_variant_id' => $variant->id,
-                        'product_variant_option_id' => $option->id,
-                        'value' => $value,
-                    ]);
-                }
-            }
             $keepIds[] = $variant->id;
         }
 
