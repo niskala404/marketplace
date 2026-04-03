@@ -596,6 +596,11 @@ class CheckoutController extends Controller
                 continue;
             }
 
+            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
+            if ($item->sku_snapshot !== $expectedBaseSku) {
+                $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
+            }
+
             if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
                 $invalidIds[] = $item->id;
             }

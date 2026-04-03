@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CartAddRequest;
+use App\Http\Requests\CartUpdateRequest;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
@@ -31,13 +33,8 @@ class CartController extends Controller
 
     }
 
-    public function add(Request $request, int $productId)
+    public function add(CartAddRequest $request, int $productId)
     {
-        $request->validate([
-            'qty' => ['nullable','integer','min:1'],
-            'product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
-            'sku' => ['nullable', 'string', 'max:120'],
-        ]);
         $qty = (int)($request->input('qty', 1));
         $buyNow = (bool) $request->boolean('buy_now');
         $productVariantId = $request->input('product_variant_id');
@@ -45,6 +42,7 @@ class CartController extends Controller
 
         $product = Product::where('is_active', true)->findOrFail($productId);
         $variant = null;
+        $skuSnapshot = 'PRODUCT-'.$product->id;
         $availableStock = (int)$product->stock;
         if ($product->variants()->exists()) {
             if (!$productVariantId && $skuInput === '') {
@@ -62,6 +60,7 @@ class CartController extends Controller
             }
 
             $variant = $variantQuery->firstOrFail();
+            $skuSnapshot = (string) $variant->sku;
 
             $availableStock = (int)$variant->stock;
         }
@@ -80,7 +79,7 @@ class CartController extends Controller
             'product_id' => $product->id,
             'product_variant_id' => $variant?->id,
         ], [
-            'sku_snapshot' => $variant?->sku,
+            'sku_snapshot' => $skuSnapshot,
         ]);
 
         $newQty = $item->qty + $qty;
@@ -93,7 +92,7 @@ class CartController extends Controller
 
         $item->update([
             'qty' => $newQty,
-            'sku_snapshot' => $variant?->sku ?? $item->sku_snapshot,
+            'sku_snapshot' => $skuSnapshot,
         ]);
 
         if ($request->expectsJson()) {
@@ -112,10 +111,8 @@ class CartController extends Controller
         return back()->with('success', 'Berhasil ditambahkan ke keranjang.');
     }
 
-    public function update(Request $request, int $itemId)
+    public function update(CartUpdateRequest $request, int $itemId)
     {
-        $request->validate(['qty' => ['required','integer','min:1']]);
-
         $item = CartItem::with('product','cart','variant')->findOrFail($itemId);
         abort_if($item->cart->user_id !== $request->user()->id, 403);
 
@@ -160,6 +157,11 @@ class CartController extends Controller
                     $invalidIds[] = $item->id;
                 }
                 continue;
+            }
+
+            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
+            if ($item->sku_snapshot !== $expectedBaseSku) {
+                $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
             }
 
             if ($item->product->variants->where('is_active', true)->isNotEmpty()) {

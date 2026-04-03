@@ -69,6 +69,12 @@ Route::post('/report', [ReportController::class, 'store'])
     ->name('report.store');
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/live/start', [LiveStreamController::class, 'start'])
+        ->middleware(['role:seller', 'throttle:marketplace-write'])
+        ->name('live.start');
+    Route::post('/live/stop', [LiveStreamController::class, 'stop'])
+        ->middleware(['role:seller', 'throttle:marketplace-write'])
+        ->name('live.stop');
 
     // affiliate
     Route::get('/affiliate', [AffiliateController::class, 'index'])->name('affiliate.index');

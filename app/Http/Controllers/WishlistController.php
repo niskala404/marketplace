@@ -59,23 +59,37 @@ class WishlistController extends Controller
         if (!$product->is_active || $product->stock < 1) {
             return back()->with('error', 'Produk tidak tersedia atau stok habis.');
         }
-        if ($product->variants()->exists()) {
-            return back()->with('error', 'Produk ini punya varian. Silakan pilih varian di halaman produk.');
-        }
 
         DB::transaction(function () use ($user, $product, $wishlistItem) {
             $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+            $variant = null;
+            $skuSnapshot = 'PRODUCT-'.$product->id;
+
+            if ($product->variants()->exists()) {
+                $variant = $product->variants()
+                    ->where('is_active', true)
+                    ->where('stock', '>', 0)
+                    ->orderBy('price')
+                    ->orderBy('id')
+                    ->first();
+
+                if (!$variant) {
+                    return;
+                }
+                $skuSnapshot = (string) $variant->sku;
+            }
 
             $cartItem = CartItem::firstOrCreate([
                 'cart_id' => $cart->id,
                 'product_id' => $product->id,
-                'product_variant_id' => null,
+                'product_variant_id' => $variant?->id,
             ], [
-                'sku_snapshot' => null,
+                'sku_snapshot' => $skuSnapshot,
                 'qty' => 0,
             ]);
 
-            if ($cartItem->qty < $product->stock) {
+            $stockLimit = $variant ? (int) $variant->stock : (int) $product->stock;
+            if ($cartItem->qty < $stockLimit) {
                 $cartItem->update(['qty' => $cartItem->qty + 1]);
                 $wishlistItem->delete();
             }
@@ -107,21 +121,33 @@ class WishlistController extends Controller
                     $skipped++;
                     continue;
                 }
+                $variant = null;
+                $skuSnapshot = 'PRODUCT-'.$product->id;
                 if ($product->variants()->exists()) {
-                    $skipped++;
-                    continue;
+                    $variant = $product->variants()
+                        ->where('is_active', true)
+                        ->where('stock', '>', 0)
+                        ->orderBy('price')
+                        ->orderBy('id')
+                        ->first();
+                    if (!$variant) {
+                        $skipped++;
+                        continue;
+                    }
+                    $skuSnapshot = (string) $variant->sku;
                 }
 
                 $cartItem = CartItem::firstOrCreate([
                     'cart_id' => $cart->id,
                     'product_id' => $product->id,
-                    'product_variant_id' => null,
+                    'product_variant_id' => $variant?->id,
                 ], [
-                    'sku_snapshot' => null,
+                    'sku_snapshot' => $skuSnapshot,
                     'qty' => 0,
                 ]);
 
-                if ($cartItem->qty >= $product->stock) {
+                $stockLimit = $variant ? (int) $variant->stock : (int) $product->stock;
+                if ($cartItem->qty >= $stockLimit) {
                     $skipped++;
                     continue;
                 }
