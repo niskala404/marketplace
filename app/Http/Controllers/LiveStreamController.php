@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\LiveStream;
+
 
 class LiveStreamController extends Controller
 {
@@ -17,10 +17,5 @@ class LiveStreamController extends Controller
         return view('live.index', compact('streams'));
     }
 
-    public function show(LiveStream $live)
-    {
-        $live->load(['shop', 'products.images']);
 
-        return view('live.show', compact('live'));
-    }
 }

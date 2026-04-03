@@ -176,24 +176,6 @@ class ProductController extends Controller
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
 
-        ]);
-
-        DB::transaction(function () use ($request, $product, $data) {
-            $product->update([
-                'name' => $data['name'],
-                'category_id' => $data['category_id'] ?? null,
-                'description' => $data['description'] ?? null,
-                'price' => $data['price'],
-                'discount_type' => $data['discount_type'] ?? 'none',
-                'discount_value' => (int)($data['discount_value'] ?? 0),
-                'weight_grams' => $data['weight_grams'],
-                'stock' => $data['stock'],
-                'is_active' => (bool)($data['is_active'] ?? false),
-                // editing requires re-approval (marketplace style)
-                'approval_status' => 'pending',
-                'rejected_reason' => null,
-            ]);
-
             if ($request->hasFile('images')) {
                 $i = ($product->images()->max('sort_order') ?? 0) + 1;
                 foreach ($request->file('images') as $img) {
@@ -243,7 +225,6 @@ class ProductController extends Controller
 
         $keepIds = [];
 
-        foreach ($variants as $row) {
             $variant = null;
             if (!empty($row['id'])) {
                 $variant = ProductVariant::where('product_id', $product->id)->where('id', (int)$row['id'])->first();
@@ -253,9 +234,7 @@ class ProductController extends Controller
             }
 
             $sku = trim((string) ($row['sku'] ?? ''));
-            $variant->fill([
-                'name' => trim((string) $row['name']),
-                'sku' => $sku !== '' ? $sku : ('SKU-'.Str::upper(Str::random(8))),
+
                 'price' => isset($row['price']) && $row['price'] !== '' ? (int) $row['price'] : null,
                 'stock' => (int) ($row['stock'] ?? 0),
                 'is_active' => true,

@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\FlashSaleItem;
 use App\Notifications\OrderPlacedNotification;
 use App\Notifications\OrderStatusChangedNotification;
+use App\Services\CartPricingService;
 use App\Services\ShippingCalculator;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
@@ -29,10 +30,10 @@ class CheckoutController extends Controller
         return '5-8 hari';
     }
 
-    public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
+    public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers, CartPricingService $pricing)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $cart->items()->with('product.shop', 'variant')->get();
+
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -55,12 +56,12 @@ class CheckoutController extends Controller
 
         $groups = $items->groupBy(fn($it) => $it->product->shop_id);
 
-        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress, $flashPriceMap) {
+        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress, $flashPriceMap, $pricing) {
             $shop = $groupItems->first()->product->shop;
 
-            $subtotal = $groupItems->sum(function ($it) use ($flashPriceMap) {
+            $subtotal = $groupItems->sum(function ($it) use ($flashPriceMap, $pricing) {
                 $p = $it->product;
-                $unit = $flashPriceMap[$p->id] ?? (method_exists($p,'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
+                $unit = $pricing->resolveUnitPrice($p, $it->variant, $flashPriceMap);
                 return $unit * (int)$it->qty;
             });
 
@@ -182,7 +183,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function place(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
+    public function place(Request $request, ShippingCalculator $shipping, VoucherService $vouchers, CartPricingService $pricing)
     {
         $request->validate([
             'address_id' => ['required','integer','exists:addresses,id'],
@@ -196,7 +197,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $cart->items()->with('product.shop', 'variant')->get();
+
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -211,7 +212,7 @@ class CheckoutController extends Controller
             ->filter(fn($v) => $v !== '')
             ->all();
 
-        DB::transaction(function () use ($user, $items, $address, $groups, $request, $cart, $shipping, $vouchers, $platformVoucherCode, $shopVoucherCodes, $flashPriceMap) {
+        DB::transaction(function () use ($user, $items, $address, $groups, $request, $cart, $shipping, $vouchers, $platformVoucherCode, $shopVoucherCodes, $flashPriceMap, $pricing) {
 
             // cek stok final
             foreach ($items as $it) {
@@ -265,9 +266,9 @@ class CheckoutController extends Controller
             foreach ($groups as $shopId => $shopItems) {
                 $shopId = (int) $shopId;
 
-                $subtotal = (int) $shopItems->sum(function ($it) use ($flashPriceMap) {
+                $subtotal = (int) $shopItems->sum(function ($it) use ($flashPriceMap, $pricing) {
                     $p = $it->product;
-                    $unit = $flashPriceMap[$p->id] ?? (method_exists($p, 'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
+                    $unit = $pricing->resolveUnitPrice($p, $it->variant, $flashPriceMap);
                     return $unit * (int)$it->qty;
                 });
 
@@ -405,8 +406,7 @@ class CheckoutController extends Controller
                 }
 
                 foreach ($shopItems as $it) {
-                    $unit = $flashPriceMap[$it->product->id]
-                        ?? (method_exists($it->product, 'discountedPrice') ? (int)$it->product->discountedPrice() : (int)$it->product->price);
+                    $unit = $pricing->resolveUnitPrice($it->product, $it->variant, $flashPriceMap);
 
                     OrderItem::create([
                         'order_id' => $order->id,
@@ -414,7 +414,7 @@ class CheckoutController extends Controller
                         'product_name' => $it->product->name,
                         'product_variant_id' => $it->variant?->id,
                         'variant_name' => $it->variant?->name,
-                        'sku' => $it->variant?->sku,
+
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -544,6 +544,11 @@ class CheckoutController extends Controller
 
             foreach ($locked->items as $item) {
                 Product::query()->whereKey($item->product_id)->increment('stock', (int)$item->qty);
+                if ($item->product_variant_id) {
+                    DB::table('product_variants')
+                        ->where('id', (int) $item->product_variant_id)
+                        ->increment('stock', (int) $item->qty);
+                }
             }
 
             $vouchers->rollbackForOrder((int)$locked->id);
@@ -564,4 +569,5 @@ class CheckoutController extends Controller
 
         return back()->with('success', 'Pesanan berhasil dibatalkan. Stok dikembalikan.');
     }
+
 }

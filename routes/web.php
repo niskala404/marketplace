@@ -60,6 +60,7 @@ Route::get('/search/suggest', SearchSuggestController::class)->name('search.sugg
 Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
 Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
+
 Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
 
 // Report (public can submit, user_id nullable)
@@ -68,6 +69,12 @@ Route::post('/report', [ReportController::class, 'store'])
     ->name('report.store');
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/live/start', [LiveStreamController::class, 'start'])
+        ->middleware(['role:seller', 'throttle:marketplace-write'])
+        ->name('live.start');
+    Route::post('/live/stop', [LiveStreamController::class, 'stop'])
+        ->middleware(['role:seller', 'throttle:marketplace-write'])
+        ->name('live.stop');
 
     // affiliate
     Route::get('/affiliate', [AffiliateController::class, 'index'])->name('affiliate.index');

@@ -61,17 +61,11 @@ class WishlistController extends Controller
         }
 
 
-        DB::transaction(function () use ($user, $product, $wishlistItem) {
-            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
             $cartItem = CartItem::firstOrCreate([
                 'cart_id' => $cart->id,
                 'product_id' => $product->id,
-            ], [
-                'qty' => 0,
-            ]);
 
-            if ($cartItem->qty < $product->stock) {
                 $cartItem->update(['qty' => $cartItem->qty + 1]);
                 $wishlistItem->delete();
             }
@@ -108,11 +102,7 @@ class WishlistController extends Controller
                 $cartItem = CartItem::firstOrCreate([
                     'cart_id' => $cart->id,
                     'product_id' => $product->id,
-                ], [
-                    'qty' => 0,
-                ]);
 
-                if ($cartItem->qty >= $product->stock) {
                     $skipped++;
                     continue;
                 }

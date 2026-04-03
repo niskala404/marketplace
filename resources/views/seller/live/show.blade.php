@@ -21,14 +21,7 @@
   </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-2 bg-white border rounded-2xl p-5">
-    <div class="aspect-video rounded-2xl overflow-hidden bg-black">
-      @if($live->stream_url)
-        <iframe src="{{ $live->stream_url }}" class="w-full h-full" allowfullscreen></iframe>
-      @else
-        <div class="w-full h-full flex items-center justify-center text-white">Belum ada URL stream</div>
-      @endif
+
     </div>
     <div class="mt-4 text-slate-700 whitespace-pre-line">{{ $live->description }}</div>
   </div>
@@ -44,4 +37,5 @@
     </div>
   </div>
 </div>
+
 @endsection
