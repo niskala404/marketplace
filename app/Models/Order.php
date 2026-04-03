@@ -43,13 +43,24 @@ class Order extends Model
 
     public function verifier() { return $this->belongsTo(User::class, 'payment_verified_by'); }
 
-    public function logShipmentEvent(string $status, string $title, ?string $description = null, $when = null): void
+    public function logShipmentEvent(
+        string $status,
+        string $title,
+        ?string $description = null,
+        $when = null,
+        ?string $eventCode = null,
+        ?string $location = null,
+        ?array $meta = null
+    ): void
     {
         $when = $when ?: now();
         $this->shipmentEvents()->create([
             'status' => $status,
+            'event_code' => $eventCode ?: $status,
             'title' => $title,
             'description' => $description,
+            'location' => $location,
+            'meta' => $meta,
             'happened_at' => $when,
         ]);
     }
