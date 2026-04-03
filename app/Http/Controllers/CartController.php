@@ -18,7 +18,7 @@ class CartController extends Controller
     public function index(Request $request, CartPricingService $pricing)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $this->sanitizeItems($cart);
+
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
         $flashPriceMap = FlashSaleItem::promoPriceMap($productIds);
@@ -35,32 +35,7 @@ class CartController extends Controller
 
     public function add(CartAddRequest $request, int $productId)
     {
-        $qty = (int)($request->input('qty', 1));
-        $buyNow = (bool) $request->boolean('buy_now');
-        $productVariantId = $request->input('product_variant_id');
-        $skuInput = trim((string) $request->input('sku', ''));
 
-        $product = Product::where('is_active', true)->findOrFail($productId);
-        $variant = null;
-        $skuSnapshot = 'PRODUCT-'.$product->id;
-        $availableStock = (int)$product->stock;
-        if ($product->variants()->exists()) {
-            if (!$productVariantId && $skuInput === '') {
-                return back()->with('error', 'Pilih varian produk terlebih dahulu.');
-            }
-
-            $variantQuery = ProductVariant::query()
-                ->where('product_id', $product->id)
-                ->where('is_active', true);
-
-            if ($productVariantId) {
-                $variantQuery->whereKey((int) $productVariantId);
-            } else {
-                $variantQuery->where('sku', $skuInput);
-            }
-
-            $variant = $variantQuery->firstOrFail();
-            $skuSnapshot = (string) $variant->sku;
 
             $availableStock = (int)$variant->stock;
         }
@@ -78,8 +53,7 @@ class CartController extends Controller
             'cart_id' => $cart->id,
             'product_id' => $product->id,
             'product_variant_id' => $variant?->id,
-        ], [
-            'sku_snapshot' => $skuSnapshot,
+
         ]);
 
         $newQty = $item->qty + $qty;
@@ -113,6 +87,7 @@ class CartController extends Controller
 
     public function update(CartUpdateRequest $request, int $itemId)
     {
+
         $item = CartItem::with('product','cart','variant')->findOrFail($itemId);
         abort_if($item->cart->user_id !== $request->user()->id, 403);
 

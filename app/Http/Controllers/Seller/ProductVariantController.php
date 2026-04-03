@@ -60,7 +60,7 @@ class ProductVariantController extends Controller
 
             foreach ($data['variants'] as $variantPayload) {
                 $sku = trim((string)($variantPayload['sku'] ?? ''));
-                $sku = $this->generateUniqueSku($sku);
+
 
                 $variant = ProductVariant::create([
                     'product_id' => $product->id,

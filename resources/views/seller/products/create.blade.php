@@ -89,9 +89,7 @@
                 <button type="button" id="addVariantBtn" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                <input id="variantOptionName1" name="variant_options[0]" class="rounded-xl border-slate-200" placeholder="Nama opsi 1 (contoh: Warna)">
-                <input id="variantOptionValues1" class="rounded-xl border-slate-200" placeholder="Nilai opsi 1 (Merah, Hitam)">
-                <input id="variantOptionName2" name="variant_options[1]" class="rounded-xl border-slate-200" placeholder="Nama opsi 2 (contoh: Ukuran)">
+
                 <input id="variantOptionValues2" class="rounded-xl border-slate-200" placeholder="Nilai opsi 2 (S, M, L)">
             </div>
             <button type="button" id="generateVariantsBtn" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold mb-3">Generate Kombinasi Otomatis</button>
@@ -132,7 +130,7 @@
         <input type=\"number\" min=\"0\" name=\"variants[${variantIdx}][stock]\" value=\"${row.stock || ''}\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
         <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
       </div>
-      <input type=\"hidden\" name=\"variants[${variantIdx}][attributes]\" value='${row.attributes || ""}'>
+
     `;
     variantRows.appendChild(wrap);
     wrap.querySelector('.remove-variant').addEventListener('click', () => wrap.remove());
@@ -159,10 +157,7 @@
     const combos = vals2.length ? cartesian([vals1, vals2]) : vals1.map(v => [v]);
     combos.forEach((combo) => {
       const name = combo.join(' / ');
-      const attributes = {};
-      attributes[name1] = combo[0];
-      if (vals2.length && name2) attributes[name2] = combo[1];
-      addVariantRow({ name, attributes: JSON.stringify(attributes) });
+
     });
   });
 

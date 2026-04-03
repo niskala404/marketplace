@@ -33,7 +33,7 @@ class CheckoutController extends Controller
     public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers, CartPricingService $pricing)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $this->sanitizeCheckoutItems($cart);
+
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -197,7 +197,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $this->sanitizeCheckoutItems($cart);
+
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -414,7 +414,7 @@ class CheckoutController extends Controller
                         'product_name' => $it->product->name,
                         'product_variant_id' => $it->variant?->id,
                         'variant_name' => $it->variant?->name,
-                        'sku' => $it->sku_snapshot ?: $it->variant?->sku,
+
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -570,47 +570,4 @@ class CheckoutController extends Controller
         return back()->with('success', 'Pesanan berhasil dibatalkan. Stok dikembalikan.');
     }
 
-    private function sanitizeCheckoutItems(Cart $cart)
-    {
-        $items = $cart->items()->with('product.shop', 'product.variants', 'variant')->get();
-        $invalidIds = [];
-
-        foreach ($items as $item) {
-            if (!$item->product || !$item->product->is_active) {
-                $invalidIds[] = $item->id;
-                continue;
-            }
-
-            if ($item->product_variant_id) {
-                if ($item->variant && !$item->sku_snapshot) {
-                    $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
-                }
-                if (
-                    !$item->variant
-                    || (int) $item->variant->product_id !== (int) $item->product_id
-                    || !$item->variant->is_active
-                    || ($item->sku_snapshot && $item->sku_snapshot !== $item->variant->sku)
-                ) {
-                    $invalidIds[] = $item->id;
-                }
-                continue;
-            }
-
-            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
-            if ($item->sku_snapshot !== $expectedBaseSku) {
-                $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
-            }
-
-            if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
-                $invalidIds[] = $item->id;
-            }
-        }
-
-        if ($invalidIds) {
-            $cart->items()->whereIn('id', $invalidIds)->delete();
-            return $cart->items()->with('product.shop', 'variant')->get();
-        }
-
-        return $items;
-    }
 }
