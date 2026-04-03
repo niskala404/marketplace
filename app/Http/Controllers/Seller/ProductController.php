@@ -136,7 +136,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants($product, $data['variants'] ?? []);
+            $this->syncInlineVariants($product, $data['variants'] ?? [], $request->has('variants'));
         });
 
         return redirect()->route('seller.products.index')->with('success', 'Produk dibuat.');
@@ -203,7 +203,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants($product, $data['variants'] ?? []);
+            $this->syncInlineVariants($product, $data['variants'] ?? [], $request->has('variants'));
         });
 
         return back()->with('success', 'Produk diperbarui.');
@@ -222,13 +222,16 @@ class ProductController extends Controller
         return back()->with('success', 'Produk dihapus.');
     }
 
-    private function syncInlineVariants(Product $product, array $variants): void
+    private function syncInlineVariants(Product $product, array $variants, bool $variantsPayloadExists = false): void
     {
         $variants = collect($variants)
             ->filter(fn ($row) => trim((string) ($row['name'] ?? '')) !== '')
             ->values();
 
         if ($variants->isEmpty()) {
+            if ($variantsPayloadExists) {
+                $product->variants()->delete();
+            }
             return;
         }
 

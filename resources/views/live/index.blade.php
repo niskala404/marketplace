@@ -19,7 +19,8 @@
       <div class="p-3">
         <div class="font-bold">{{ $live->title }}</div>
         <div class="text-xs text-slate-500 mt-1">{{ $live->shop->name }}</div>
-        <div class="mt-2 text-xs px-2 py-1 rounded-full inline-block {{ $live->status === 'live' ? 'bg-rose-600 text-white' : 'bg-slate-100' }}">{{ strtoupper($live->status) }}</div>
+        @php($displayStatus = $live->status === 'scheduled' ? 'draft' : $live->status)
+        <div class="mt-2 text-xs px-2 py-1 rounded-full inline-block {{ $live->status === 'live' ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-100' }}">{{ strtoupper($displayStatus) }}</div>
       </div>
     </a>
   @empty

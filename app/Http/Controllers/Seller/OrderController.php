@@ -34,6 +34,20 @@ class OrderController extends Controller
             'tracking_no' => ['nullable','string','max:80'],
         ]);
 
+        $allowedTransitions = [
+            'pending' => ['paid', 'processing', 'cancelled'],
+            'paid' => ['processing', 'shipped', 'cancelled'],
+            'processing' => ['shipped', 'cancelled'],
+            'shipped' => ['completed'],
+            'completed' => [],
+            'cancelled' => [],
+        ];
+
+        if ($request->status !== $order->status) {
+            $allowed = $allowedTransitions[$order->status] ?? [];
+            abort_if(!in_array($request->status, $allowed, true), 422, 'Transisi status tidak valid.');
+        }
+
         $payload = ['status' => $request->status];
         $oldStatus = $order->status;
 

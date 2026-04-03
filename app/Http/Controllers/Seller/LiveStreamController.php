@@ -45,7 +45,7 @@ class LiveStreamController extends Controller
             'description' => $data['description'] ?? null,
             'stream_url' => $data['stream_url'] ?? null,
             'scheduled_at' => $data['scheduled_at'] ?? null,
-            'status' => 'scheduled',
+            'status' => 'scheduled', // mapped as draft in UI
             'thumbnail_path' => $request->file('thumbnail') ? $request->file('thumbnail')->store('live-thumbnails', 'public') : null,
         ]);
 
@@ -76,14 +76,15 @@ class LiveStreamController extends Controller
         abort_if($live->shop_id !== auth()->user()->shop->id, 403);
 
         $data = $request->validate([
-            'status' => ['required', 'in:scheduled,live,ended'],
+            'status' => ['required', 'in:draft,scheduled,live,ended'],
         ]);
 
-        $payload = ['status' => $data['status']];
-        if ($data['status'] === 'live' && !$live->started_at) {
+        $targetStatus = $data['status'] === 'draft' ? 'scheduled' : $data['status'];
+        $payload = ['status' => $targetStatus];
+        if ($targetStatus === 'live' && !$live->started_at) {
             $payload['started_at'] = now();
         }
-        if ($data['status'] === 'ended' && !$live->ended_at) {
+        if ($targetStatus === 'ended' && !$live->ended_at) {
             $payload['ended_at'] = now();
         }
 

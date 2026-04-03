@@ -12,14 +12,14 @@
       <div class="p-4 flex items-center justify-between gap-3">
         <div>
           <a href="{{ route('seller.live.show', $live) }}" class="font-bold hover:underline">{{ $live->title }}</a>
-          <div class="text-xs text-slate-500">Status: {{ strtoupper($live->status) }}</div>
+          <div class="text-xs text-slate-500">Status: {{ strtoupper($live->status === 'scheduled' ? 'draft' : $live->status) }}</div>
         </div>
         <form method="POST" action="{{ route('seller.live.status', $live) }}" class="flex gap-2">
           @csrf
           <select name="status" class="rounded-xl border-slate-200">
-            @foreach(['scheduled','live','ended'] as $status)
-              <option value="{{ $status }}" @selected($live->status === $status)>{{ strtoupper($status) }}</option>
-            @endforeach
+            <option value="draft" @selected($live->status === 'scheduled')>DRAFT</option>
+            <option value="live" @selected($live->status === 'live')>LIVE</option>
+            <option value="ended" @selected($live->status === 'ended')>ENDED</option>
           </select>
           <button class="px-3 py-2 rounded-xl bg-slate-900 text-white">Update</button>
         </form>

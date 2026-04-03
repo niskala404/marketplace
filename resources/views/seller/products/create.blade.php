@@ -88,6 +88,13 @@
                 <div class="font-bold">Varian Produk (Opsional)</div>
                 <button type="button" id="addVariantBtn" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                <input id="variantOptionName1" class="rounded-xl border-slate-200" placeholder="Nama opsi 1 (contoh: Warna)">
+                <input id="variantOptionValues1" class="rounded-xl border-slate-200" placeholder="Nilai opsi 1 (Merah, Hitam)">
+                <input id="variantOptionName2" class="rounded-xl border-slate-200" placeholder="Nama opsi 2 (contoh: Ukuran)">
+                <input id="variantOptionValues2" class="rounded-xl border-slate-200" placeholder="Nilai opsi 2 (S, M, L)">
+            </div>
+            <button type="button" id="generateVariantsBtn" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold mb-3">Generate Kombinasi Otomatis</button>
             <div id="variantRows" class="space-y-2"></div>
             <div class="text-xs text-slate-500 mt-2">Jika produk punya ukuran/warna berbeda, tambahkan di sini agar langsung terkelola saat produk dibuat.</div>
         </div>
@@ -110,6 +117,7 @@
 <script>
 (() => {
   const addVariantBtn = document.getElementById('addVariantBtn');
+  const generateVariantsBtn = document.getElementById('generateVariantsBtn');
   const variantRows = document.getElementById('variantRows');
   let variantIdx = 0;
 
@@ -131,6 +139,28 @@
   };
 
   addVariantBtn?.addEventListener('click', () => addVariantRow());
+
+  const cartesian = (arr) => arr.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
+  generateVariantsBtn?.addEventListener('click', () => {
+    const name1 = document.getElementById('variantOptionName1')?.value?.trim();
+    const name2 = document.getElementById('variantOptionName2')?.value?.trim();
+    const vals1 = (document.getElementById('variantOptionValues1')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+    const vals2 = (document.getElementById('variantOptionValues2')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+
+    if (!name1 || !vals1.length) {
+      alert('Isi minimal opsi 1 dan nilainya untuk generate kombinasi.');
+      return;
+    }
+
+    variantRows.innerHTML = '';
+    variantIdx = 0;
+
+    const combos = vals2.length ? cartesian([vals1, vals2]) : vals1.map(v => [v]);
+    combos.forEach((combo) => {
+      const name = combo.join(' / ');
+      addVariantRow({ name });
+    });
+  });
 
   const input = document.getElementById('imagesInput');
   const preview = document.getElementById('imagePreview');

@@ -72,6 +72,13 @@
                 <div class="font-bold">Kelola Varian</div>
                 <button type="button" id="addVariantBtnEdit" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
             </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                <input id="variantOptionName1Edit" class="rounded-xl border-slate-200" placeholder="Nama opsi 1 (contoh: Warna)">
+                <input id="variantOptionValues1Edit" class="rounded-xl border-slate-200" placeholder="Nilai opsi 1 (Merah, Hitam)">
+                <input id="variantOptionName2Edit" class="rounded-xl border-slate-200" placeholder="Nama opsi 2 (contoh: Ukuran)">
+                <input id="variantOptionValues2Edit" class="rounded-xl border-slate-200" placeholder="Nilai opsi 2 (S, M, L)">
+            </div>
+            <button type="button" id="generateVariantsBtnEdit" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold mb-3">Generate Kombinasi Otomatis</button>
             <div id="variantRowsEdit" class="space-y-2">
                 @foreach($product->variants()->orderBy('id')->get() as $idx => $variant)
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white variant-edit-row">
@@ -127,6 +134,7 @@
 <script>
 (() => {
   const rows = document.getElementById('variantRowsEdit');
+  const generateBtn = document.getElementById('generateVariantsBtnEdit');
   let idx = rows ? rows.querySelectorAll('.variant-edit-row').length : 0;
 
   const bindRemoveButtons = () => {
@@ -156,6 +164,40 @@
   });
 
   bindRemoveButtons();
+
+  const cartesian = (arr) => arr.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
+  generateBtn?.addEventListener('click', () => {
+    const name1 = document.getElementById('variantOptionName1Edit')?.value?.trim();
+    const name2 = document.getElementById('variantOptionName2Edit')?.value?.trim();
+    const vals1 = (document.getElementById('variantOptionValues1Edit')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+    const vals2 = (document.getElementById('variantOptionValues2Edit')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+
+    if (!rows || !name1 || !vals1.length) {
+      alert('Isi minimal opsi 1 dan nilainya untuk generate kombinasi.');
+      return;
+    }
+
+    rows.innerHTML = '';
+    idx = 0;
+
+    const combos = vals2.length ? cartesian([vals1, vals2]) : vals1.map(v => [v]);
+    combos.forEach((combo) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white variant-edit-row';
+      wrap.innerHTML = `
+        <input name=\"variants[${idx}][name]\" value=\"${combo.join(' / ')}\" class=\"rounded-xl border-slate-200\" placeholder=\"Nama varian (Merah / XL)\">
+        <input name=\"variants[${idx}][sku]\" class=\"rounded-xl border-slate-200\" placeholder=\"SKU (opsional)\">
+        <input type=\"number\" min=\"0\" name=\"variants[${idx}][price]\" class=\"rounded-xl border-slate-200\" placeholder=\"Harga varian (opsional)\">
+        <div class=\"flex gap-2\">
+          <input type=\"number\" min=\"0\" name=\"variants[${idx}][stock]\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
+          <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
+        </div>
+      `;
+      rows.appendChild(wrap);
+      idx++;
+    });
+    bindRemoveButtons();
+  });
 
   const input = document.getElementById('imagesInputEdit');
   const preview = document.getElementById('imagePreviewEdit');

@@ -16,12 +16,16 @@ class LiveStream extends Model
         'scheduled_at',
         'started_at',
         'ended_at',
+        'viewer_count',
+        'chat_enabled',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'viewer_count' => 'integer',
+        'chat_enabled' => 'boolean',
     ];
 
     public function shop()
