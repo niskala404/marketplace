@@ -113,6 +113,12 @@
                     <x-ic name="wallet" class="w-5 h-5" />
                 </a>
 
+                @if(auth()->user()->role === 'seller' && Route::has('seller.live.index'))
+                    <a href="{{ route('seller.live.index') }}" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Live Seller" aria-label="Live Seller">
+                        <x-ic name="video" class="w-5 h-5" />
+                    </a>
+                @endif
+
                 <a href="{{ route('account.profile') }}" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Akun" aria-label="Akun">
                     <x-ic name="user" class="w-5 h-5" />
                 </a>

@@ -67,6 +67,28 @@
             <textarea name="description" rows="4" class="w-full rounded-xl border-slate-200">{{ $product->description }}</textarea>
         </div>
 
+        <div class="border rounded-2xl p-4 bg-slate-50">
+            <div class="flex items-center justify-between mb-3">
+                <div class="font-bold">Kelola Varian</div>
+                <button type="button" id="addVariantBtnEdit" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
+            </div>
+            <div id="variantRowsEdit" class="space-y-2">
+                @foreach($product->variants()->orderBy('id')->get() as $idx => $variant)
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white variant-edit-row">
+                        <input type="hidden" name="variants[{{ $idx }}][id]" value="{{ $variant->id }}">
+                        <input name="variants[{{ $idx }}][name]" value="{{ $variant->name }}" class="rounded-xl border-slate-200" placeholder="Nama varian (Merah / XL)">
+                        <input name="variants[{{ $idx }}][sku]" value="{{ $variant->sku }}" class="rounded-xl border-slate-200" placeholder="SKU (opsional)">
+                        <input type="number" min="0" name="variants[{{ $idx }}][price]" value="{{ $variant->price }}" class="rounded-xl border-slate-200" placeholder="Harga varian (opsional)">
+                        <div class="flex gap-2">
+                            <input type="number" min="0" name="variants[{{ $idx }}][stock]" value="{{ $variant->stock }}" class="rounded-xl border-slate-200 w-full" placeholder="Stok">
+                            <button type="button" class="remove-variant px-3 rounded-xl border">✕</button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            <div class="text-xs text-slate-500 mt-2">Tips: Anda bisa ubah ukuran/harga varian langsung di halaman edit produk ini.</div>
+        </div>
+
         <div>
             <label class="font-semibold">Tambah gambar (opsional)</label>
             <input type="file" id="imagesInputEdit" name="images[]" multiple class="w-full" accept="image/*">
@@ -104,6 +126,37 @@
 
 <script>
 (() => {
+  const rows = document.getElementById('variantRowsEdit');
+  let idx = rows ? rows.querySelectorAll('.variant-edit-row').length : 0;
+
+  const bindRemoveButtons = () => {
+    rows?.querySelectorAll('.remove-variant').forEach((btn) => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => btn.closest('.variant-edit-row')?.remove());
+    });
+  };
+
+  document.getElementById('addVariantBtnEdit')?.addEventListener('click', () => {
+    if (!rows) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white variant-edit-row';
+    wrap.innerHTML = `
+      <input name=\"variants[${idx}][name]\" class=\"rounded-xl border-slate-200\" placeholder=\"Nama varian (Merah / XL)\">
+      <input name=\"variants[${idx}][sku]\" class=\"rounded-xl border-slate-200\" placeholder=\"SKU (opsional)\">
+      <input type=\"number\" min=\"0\" name=\"variants[${idx}][price]\" class=\"rounded-xl border-slate-200\" placeholder=\"Harga varian (opsional)\">
+      <div class=\"flex gap-2\">
+        <input type=\"number\" min=\"0\" name=\"variants[${idx}][stock]\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
+        <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
+      </div>
+    `;
+    rows.appendChild(wrap);
+    idx++;
+    bindRemoveButtons();
+  });
+
+  bindRemoveButtons();
+
   const input = document.getElementById('imagesInputEdit');
   const preview = document.getElementById('imagePreviewEdit');
   if (!input || !preview) return;

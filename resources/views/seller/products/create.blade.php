@@ -83,6 +83,15 @@
             <textarea name="description" rows="4" class="w-full rounded-xl border-slate-200">{{ old('description') }}</textarea>
         </div>
 
+        <div class="border rounded-2xl p-4 bg-slate-50">
+            <div class="flex items-center justify-between mb-3">
+                <div class="font-bold">Varian Produk (Opsional)</div>
+                <button type="button" id="addVariantBtn" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
+            </div>
+            <div id="variantRows" class="space-y-2"></div>
+            <div class="text-xs text-slate-500 mt-2">Jika produk punya ukuran/warna berbeda, tambahkan di sini agar langsung terkelola saat produk dibuat.</div>
+        </div>
+
         <div>
             <label class="font-semibold">Gambar (opsional, bisa banyak)</label>
             <input type="file" id="imagesInput" name="images[]" multiple class="w-full" accept="image/*">
@@ -100,6 +109,29 @@
 
 <script>
 (() => {
+  const addVariantBtn = document.getElementById('addVariantBtn');
+  const variantRows = document.getElementById('variantRows');
+  let variantIdx = 0;
+
+  const addVariantRow = (row = {}) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white';
+    wrap.innerHTML = `
+      <input name=\"variants[${variantIdx}][name]\" value=\"${row.name || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"Nama varian (Merah / XL)\">
+      <input name=\"variants[${variantIdx}][sku]\" value=\"${row.sku || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"SKU (opsional)\">
+      <input type=\"number\" min=\"0\" name=\"variants[${variantIdx}][price]\" value=\"${row.price || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"Harga varian (opsional)\">
+      <div class=\"flex gap-2\">
+        <input type=\"number\" min=\"0\" name=\"variants[${variantIdx}][stock]\" value=\"${row.stock || ''}\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
+        <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
+      </div>
+    `;
+    variantRows.appendChild(wrap);
+    wrap.querySelector('.remove-variant').addEventListener('click', () => wrap.remove());
+    variantIdx++;
+  };
+
+  addVariantBtn?.addEventListener('click', () => addVariantRow());
+
   const input = document.getElementById('imagesInput');
   const preview = document.getElementById('imagePreview');
   if (!input || !preview) return;
