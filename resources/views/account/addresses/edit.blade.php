@@ -8,69 +8,12 @@
 
 <div class="bg-white border rounded-2xl p-5">
     <form method="POST" action="{{ route('account.addresses.update', $address) }}" class="space-y-4">
-        @csrf @method('PUT')
+        @csrf
+        @method('PUT')
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="font-semibold">Label</label>
-                <input name="label" value="{{ old('label', $address->label) }}" class="w-full rounded-xl border-slate-200" required>
-                @error('label')<div class="text-rose-600 text-sm mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-                <label class="font-semibold">Kode Pos (opsional)</label>
-                <input name="postal_code" value="{{ old('postal_code', $address->postal_code) }}" class="w-full rounded-xl border-slate-200">
-            </div>
-        </div>
+        @include('account.addresses._form', ['address' => $address])
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="font-semibold">Nama Penerima</label>
-                <input name="recipient_name" value="{{ old('recipient_name', $address->recipient_name) }}" class="w-full rounded-xl border-slate-200" required>
-                @error('recipient_name')<div class="text-rose-600 text-sm mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-                <label class="font-semibold">No. HP</label>
-                <input name="phone" value="{{ old('phone', $address->phone) }}" class="w-full rounded-xl border-slate-200" required>
-                @error('phone')<div class="text-rose-600 text-sm mt-1">{{ $message }}</div>@enderror
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="font-semibold">Provinsi (opsional)</label>
-                <input name="province" value="{{ old('province', $address->province) }}" class="w-full rounded-xl border-slate-200">
-            </div>
-            <div>
-                <label class="font-semibold">Kota (opsional)</label>
-                <input name="city" value="{{ old('city', $address->city) }}" class="w-full rounded-xl border-slate-200">
-            </div>
-            <div>
-                <label class="font-semibold">Kecamatan (opsional)</label>
-                <input name="district" value="{{ old('district', $address->district) }}" class="w-full rounded-xl border-slate-200">
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="font-semibold">RajaOngkir City ID (opsional)</label>
-                <input name="rajaongkir_city_id" value="{{ old('rajaongkir_city_id', $address->rajaongkir_city_id) }}" class="w-full rounded-xl border-slate-200" placeholder="contoh: 39">
-                <div class="text-slate-500 text-sm mt-1">Isi jika mau ongkir real (RajaOngkir). Kalau kosong, pakai ongkir demo.</div>
-                @error('rajaongkir_city_id')<div class="text-rose-600 text-sm mt-1">{{ $message }}</div>@enderror
-            </div>
-        </div>
-
-        <div>
-            <label class="font-semibold">Alamat Lengkap</label>
-            <textarea name="full_address" rows="4" class="w-full rounded-xl border-slate-200" required>{{ old('full_address', $address->full_address) }}</textarea>
-            @error('full_address')<div class="text-rose-600 text-sm mt-1">{{ $message }}</div>@enderror
-        </div>
-
-        <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="is_default" value="1" {{ old('is_default', $address->is_default) ? 'checked' : '' }}>
-            <span class="font-semibold">Jadikan default</span>
-        </label>
-
-        <button class="w-full px-4 py-3 rounded-xl bg-slate-900 text-white font-black">Update</button>
+        <button class="w-full px-4 py-3 rounded-xl bg-slate-900 text-white font-black">Update Alamat</button>
     </form>
 </div>
 @endsection

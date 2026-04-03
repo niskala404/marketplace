@@ -8,6 +8,15 @@
         Wishlist kamu masih kosong. Yuk cari produk di <a class="text-rose-600 font-semibold" href="{{ route('home') }}">beranda</a>.
     </div>
 @else
+    <div class="mb-4 flex justify-end">
+        <form method="POST" action="{{ route('wishlist.move_all') }}">
+            @csrf
+            <button class="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold">
+                Pindahkan semua ke keranjang
+            </button>
+        </form>
+    </div>
+
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         @foreach($products as $p)
             <div class="bg-white border rounded-2xl overflow-hidden">
@@ -26,10 +35,9 @@
                             @csrf
                             <button class="w-full px-3 py-2 rounded-xl bg-rose-600 text-white font-bold">Hapus</button>
                         </form>
-                        <form method="POST" action="{{ route('cart.add',$p->id) }}" class="flex-1">
+                        <form method="POST" action="{{ route('wishlist.move_to_cart',$p) }}" class="flex-1">
                             @csrf
-                            <input type="hidden" name="qty" value="1">
-                            <button class="w-full px-3 py-2 rounded-xl bg-slate-900 text-white font-bold">+ Cart</button>
+                            <button class="w-full px-3 py-2 rounded-xl bg-slate-900 text-white font-bold">Pindah ke Cart</button>
                         </form>
                     </div>
                 </div>
