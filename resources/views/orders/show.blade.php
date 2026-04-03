@@ -131,7 +131,13 @@
                 @foreach($order->items as $it)
                     <div class="border rounded-2xl p-4">
                         <div class="flex items-center justify-between">
-                            <div class="text-sm font-semibold">{{ $it->product_name }} × {{ $it->qty }}</div>
+                            <div class="text-sm font-semibold">
+                                {{ $it->product_name }}
+                                @if($it->variant_name)
+                                    <span class="text-xs text-slate-500">({{ $it->variant_name }})</span>
+                                @endif
+                                × {{ $it->qty }}
+                            </div>
                             <div class="font-black text-rose-600">Rp {{ number_format($it->line_total,0,',','.') }}</div>
                         </div>
 
@@ -180,7 +186,16 @@
             <div class="text-slate-700">
                 <div class="font-semibold">{{ $addr['recipient_name'] ?? '-' }} ({{ $addr['phone'] ?? '-' }})</div>
                 <div class="text-sm text-slate-600 mt-1">{{ $addr['full_address'] ?? '-' }}</div>
-                <div class="text-sm text-slate-500">{{ $addr['district'] ?? '' }} {{ $addr['city'] ?? '' }} {{ $addr['province'] ?? '' }} {{ $addr['postal_code'] ?? '' }}</div>
+                @if(!empty($addr['detail_address']))
+                    <div class="text-sm text-slate-500 mt-1">Patokan: {{ $addr['detail_address'] }}</div>
+                @endif
+                <div class="text-sm text-slate-500">{{ $addr['village'] ?? '' }} {{ $addr['district'] ?? '' }} {{ $addr['city'] ?? '' }} {{ $addr['province'] ?? '' }} {{ $addr['postal_code'] ?? '' }}</div>
+                @if(!empty($addr['latitude']) && !empty($addr['longitude']))
+                    <a target="_blank" rel="noopener" class="inline-block mt-2 text-sm text-rose-600 font-semibold hover:underline"
+                       href="https://www.google.com/maps?q={{ $addr['latitude'] }},{{ $addr['longitude'] }}">
+                        Lihat lokasi pengiriman
+                    </a>
+                @endif
             </div>
         </div>
     </div>

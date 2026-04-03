@@ -60,6 +60,7 @@ class WishlistController extends Controller
             return back()->with('error', 'Produk tidak tersedia atau stok habis.');
         }
 
+
         DB::transaction(function () use ($user, $product, $wishlistItem) {
             $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
@@ -102,6 +103,7 @@ class WishlistController extends Controller
                     $skipped++;
                     continue;
                 }
+
 
                 $cartItem = CartItem::firstOrCreate([
                     'cart_id' => $cart->id,

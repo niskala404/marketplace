@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\FlashSaleItem;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class CartController extends Controller
     public function index(Request $request)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $cart->items()->with('product.images','product.shop')->get();
+        $items = $cart->items()->with('product.images','product.shop','variant')->get();
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
         $flashPriceMap = FlashSaleItem::promoPriceMap($productIds);
@@ -30,12 +31,31 @@ class CartController extends Controller
 
     public function add(Request $request, int $productId)
     {
-        $request->validate(['qty' => ['nullable','integer','min:1']]);
+        $request->validate([
+            'qty' => ['nullable','integer','min:1'],
+            'product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
+        ]);
         $qty = (int)($request->input('qty', 1));
         $buyNow = (bool) $request->boolean('buy_now');
+        $productVariantId = $request->input('product_variant_id');
 
         $product = Product::where('is_active', true)->findOrFail($productId);
-        if ($product->stock < $qty) {
+        $variant = null;
+        $availableStock = (int)$product->stock;
+        if ($product->variants()->exists()) {
+            if (!$productVariantId) {
+                return back()->with('error', 'Pilih varian produk terlebih dahulu.');
+            }
+
+            $variant = ProductVariant::query()
+                ->where('product_id', $product->id)
+                ->where('is_active', true)
+                ->findOrFail((int)$productVariantId);
+
+            $availableStock = (int)$variant->stock;
+        }
+
+        if ($availableStock < $qty) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Stok tidak mencukupi.'], 422);
             }
@@ -47,10 +67,11 @@ class CartController extends Controller
         $item = CartItem::firstOrCreate([
             'cart_id' => $cart->id,
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
         ]);
 
         $newQty = $item->qty + $qty;
-        if ($product->stock < $newQty) {
+        if ($availableStock < $newQty) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Stok tidak mencukupi untuk jumlah tersebut.'], 422);
             }
@@ -79,10 +100,11 @@ class CartController extends Controller
     {
         $request->validate(['qty' => ['required','integer','min:1']]);
 
-        $item = CartItem::with('product','cart')->findOrFail($itemId);
+        $item = CartItem::with('product','cart','variant')->findOrFail($itemId);
         abort_if($item->cart->user_id !== $request->user()->id, 403);
 
-        if ($item->product->stock < $request->qty) {
+        $availableStock = $item->variant ? (int)$item->variant->stock : (int)$item->product->stock;
+        if ($availableStock < $request->qty) {
             return back()->with('error', 'Stok tidak mencukupi.');
         }
 

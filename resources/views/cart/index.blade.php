@@ -32,6 +32,9 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="font-extrabold line-clamp-2">{{ $p->name }}</div>
+                    @if($it->variant)
+                      <div class="text-xs text-slate-500 mt-1">Varian: <span class="font-semibold">{{ $it->variant->name }}</span></div>
+                    @endif
                     <div class="text-sm text-slate-500 mt-0.5 inline-flex items-center gap-1">
                       <x-ic name="store" class="w-4 h-4 text-slate-400" />
                       <span class="truncate">{{ $p->shop->name ?? '-' }}</span>
