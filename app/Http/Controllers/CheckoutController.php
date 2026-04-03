@@ -414,7 +414,7 @@ class CheckoutController extends Controller
                         'product_name' => $it->product->name,
                         'product_variant_id' => $it->variant?->id,
                         'variant_name' => $it->variant?->name,
-                        'sku' => $it->variant?->sku,
+                        'sku' => $it->sku_snapshot ?: $it->variant?->sku,
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -582,10 +582,14 @@ class CheckoutController extends Controller
             }
 
             if ($item->product_variant_id) {
+                if ($item->variant && !$item->sku_snapshot) {
+                    $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
+                }
                 if (
                     !$item->variant
                     || (int) $item->variant->product_id !== (int) $item->product_id
                     || !$item->variant->is_active
+                    || ($item->sku_snapshot && $item->sku_snapshot !== $item->variant->sku)
                 ) {
                     $invalidIds[] = $item->id;
                 }

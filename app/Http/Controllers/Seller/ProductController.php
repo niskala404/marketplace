@@ -289,6 +289,11 @@ class ProductController extends Controller
         }
 
         foreach ($variants as $row) {
+            $baseSku = trim((string) ($row['sku'] ?? ''));
+            if ($baseSku !== '' && $variants->where('sku', $baseSku)->count() > 1) {
+                abort(422, "SKU varian duplikat di payload: {$baseSku}");
+            }
+
             $variant = null;
             if (!empty($row['id'])) {
                 $variant = ProductVariant::where('product_id', $product->id)->where('id', (int)$row['id'])->first();
@@ -298,9 +303,20 @@ class ProductController extends Controller
             }
 
             $sku = trim((string) ($row['sku'] ?? ''));
+            if ($sku === '') {
+                $sku = 'SKU-'.Str::upper(Str::random(8));
+            }
+            while (
+                ProductVariant::query()
+                    ->where('sku', $sku)
+                    ->when($variant?->id, fn ($q) => $q->where('id', '!=', $variant->id))
+                    ->exists()
+            ) {
+                $sku = 'SKU-'.Str::upper(Str::random(8));
+            }
             $variant->fill([
                 'name' => trim((string) $row['name']),
-                'sku' => $sku !== '' ? $sku : ('SKU-'.Str::upper(Str::random(8))),
+                'sku' => $sku,
                 'price' => isset($row['price']) && $row['price'] !== '' ? (int) $row['price'] : null,
                 'stock' => (int) ($row['stock'] ?? 0),
                 'is_active' => true,

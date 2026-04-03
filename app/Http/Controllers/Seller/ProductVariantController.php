@@ -60,9 +60,7 @@ class ProductVariantController extends Controller
 
             foreach ($data['variants'] as $variantPayload) {
                 $sku = trim((string)($variantPayload['sku'] ?? ''));
-                if ($sku === '') {
-                    $sku = 'SKU-'.Str::upper(Str::random(8));
-                }
+                $sku = $this->generateUniqueSku($sku);
 
                 $variant = ProductVariant::create([
                     'product_id' => $product->id,
@@ -111,9 +109,7 @@ class ProductVariantController extends Controller
         ]);
 
         $sku = trim((string)($data['sku'] ?? ''));
-        if ($sku === '') {
-            $sku = 'SKU-'.Str::upper(Str::random(8));
-        }
+        $sku = $this->generateUniqueSku($sku);
 
         ProductVariant::create([
             'product_id' => $product->id,
@@ -147,9 +143,15 @@ class ProductVariantController extends Controller
             'is_active' => ['nullable','boolean'],
         ]);
 
+        $incomingSku = trim((string)($data['sku'] ?? $variant->sku));
+        $sku = $incomingSku !== '' ? $incomingSku : (string) $variant->sku;
+        if (ProductVariant::query()->where('sku', $sku)->where('id', '!=', $variant->id)->exists()) {
+            $sku = $this->generateUniqueSku('');
+        }
+
         $variant->update([
             'name' => $data['name'],
-            'sku' => trim((string)($data['sku'] ?? $variant->sku)) ?: $variant->sku,
+            'sku' => $sku,
             'price' => $data['price'] ?? null,
             'stock' => (int)$data['stock'],
             'is_active' => (bool)($data['is_active'] ?? false),
@@ -178,5 +180,19 @@ class ProductVariantController extends Controller
         ]);
 
         return back()->with('success','Varian dihapus.');
+    }
+
+    private function generateUniqueSku(string $preferred): string
+    {
+        $sku = trim($preferred);
+        if ($sku === '') {
+            $sku = 'SKU-'.Str::upper(Str::random(8));
+        }
+
+        while (ProductVariant::query()->where('sku', $sku)->exists()) {
+            $sku = 'SKU-'.Str::upper(Str::random(8));
+        }
+
+        return $sku;
     }
 }

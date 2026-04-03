@@ -30,7 +30,7 @@
               @if($p->variants->where('is_active', true)->isNotEmpty())
                 <a href="{{ route('product.show', $p->slug) }}" class="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-slate-900 text-white">Pilih Varian</a>
               @else
-                <form method="POST" action="{{ route('cart.add', $p->id) }}" class="mt-1">
+                <form method="POST" action="{{ route('cart.add', $p->id) }}" class="mt-1 js-live-add-cart">
                   @csrf
                   <input type="hidden" name="qty" value="1">
                   <button class="text-xs px-2 py-1 rounded-full bg-rose-600 text-white">+ Keranjang</button>
@@ -60,4 +60,35 @@
     </div>
   </div>
 @endauth
+
+<script>
+(function(){
+  const token = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
+  document.querySelectorAll('.js-live-add-cart').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button[type=\"submit\"]');
+      btn?.setAttribute('disabled', 'disabled');
+      try{
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+            ...(token ? {'X-CSRF-TOKEN': token} : {}),
+          },
+          body: new FormData(form),
+        });
+        const json = await res.json().catch(() => ({}));
+        if(!res.ok){
+          alert(json.message || 'Gagal menambahkan produk ke keranjang.');
+          return;
+        }
+      }finally{
+        btn?.removeAttribute('disabled');
+      }
+    });
+  });
+})();
+</script>
 @endsection

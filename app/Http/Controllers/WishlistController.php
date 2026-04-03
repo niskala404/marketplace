@@ -69,7 +69,9 @@ class WishlistController extends Controller
             $cartItem = CartItem::firstOrCreate([
                 'cart_id' => $cart->id,
                 'product_id' => $product->id,
+                'product_variant_id' => null,
             ], [
+                'sku_snapshot' => null,
                 'qty' => 0,
             ]);
 
@@ -113,7 +115,9 @@ class WishlistController extends Controller
                 $cartItem = CartItem::firstOrCreate([
                     'cart_id' => $cart->id,
                     'product_id' => $product->id,
+                    'product_variant_id' => null,
                 ], [
+                    'sku_snapshot' => null,
                     'qty' => 0,
                 ]);
 
