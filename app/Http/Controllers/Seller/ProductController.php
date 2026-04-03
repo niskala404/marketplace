@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -95,10 +96,12 @@ class ProductController extends Controller
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
             'variants' => ['nullable', 'array'],
+
             'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
             'variants.*.sku' => ['nullable', 'string', 'max:60'],
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
+
         ]);
 
         $slug = Str::slug($data['name']);
@@ -136,7 +139,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants($product, $data['variants'] ?? [], $request->has('variants'));
+
         });
 
         return redirect()->route('seller.products.index')->with('success', 'Produk dibuat.');
@@ -166,11 +169,13 @@ class ProductController extends Controller
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
             'variants' => ['nullable', 'array'],
+
             'variants.*.id' => ['nullable', 'integer'],
             'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
             'variants.*.sku' => ['nullable', 'string', 'max:60'],
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
+
         ]);
 
         DB::transaction(function () use ($request, $product, $data) {
@@ -203,7 +208,7 @@ class ProductController extends Controller
                 }
             }
 
-            $this->syncInlineVariants($product, $data['variants'] ?? [], $request->has('variants'));
+
         });
 
         return back()->with('success', 'Produk diperbarui.');
@@ -222,7 +227,7 @@ class ProductController extends Controller
         return back()->with('success', 'Produk dihapus.');
     }
 
-    private function syncInlineVariants(Product $product, array $variants, bool $variantsPayloadExists = false): void
+
     {
         $variants = collect($variants)
             ->filter(fn ($row) => trim((string) ($row['name'] ?? '')) !== '')
@@ -231,11 +236,13 @@ class ProductController extends Controller
         if ($variants->isEmpty()) {
             if ($variantsPayloadExists) {
                 $product->variants()->delete();
+
             }
             return;
         }
 
         $keepIds = [];
+
         foreach ($variants as $row) {
             $variant = null;
             if (!empty($row['id'])) {
@@ -254,6 +261,7 @@ class ProductController extends Controller
                 'is_active' => true,
             ]);
             $variant->save();
+
             $keepIds[] = $variant->id;
         }
 

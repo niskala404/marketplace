@@ -26,7 +26,7 @@
           <div>
             <div class="text-sm font-semibold line-clamp-2">{{ $p->name }}</div>
             <div class="text-rose-600 font-bold">Rp {{ number_format($p->price,0,',','.') }}</div>
-            <span class="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-rose-600 text-white">Beli Sekarang</span>
+
           </div>
         </a>
       @empty
@@ -35,4 +35,5 @@
     </div>
   </div>
 </div>
+
 @endsection
