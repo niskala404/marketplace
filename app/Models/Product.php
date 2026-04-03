@@ -28,10 +28,11 @@ class Product extends Model
     public function reviews() { return $this->hasMany(Review::class); }
 
     public function variants() { return $this->hasMany(ProductVariant::class); }
+    public function variantOptions() { return $this->hasMany(ProductVariantOption::class)->orderBy('sort_order'); }
 
     public function mainImageUrl(): string
     {
-        $img = $this->images()->orderBy('sort_order')->first();
+        $img = $this->images()->orderByDesc('is_primary')->orderBy('sort_order')->first();
         return $img ? asset('storage/'.$img->path) : asset('images/placeholder.png');
     }
 

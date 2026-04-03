@@ -14,6 +14,7 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\Payments\MidtransController as MidtransPayment;
 use App\Http\Controllers\AffiliateController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\LiveStreamController;
 
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\FollowController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Seller\ProductVariantController as SellerProductVariant
 use App\Http\Controllers\Seller\ProductImageController as SellerProductImage;
 use App\Http\Controllers\Seller\BoostController as SellerBoost;
 use App\Http\Controllers\Seller\KycController as SellerKyc;
+use App\Http\Controllers\Seller\LiveStreamController as SellerLiveStream;
 use App\Http\Controllers\Admin\FlashSaleController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\CategoryController as AdminCategory;
@@ -57,6 +59,8 @@ Route::get('/', [StorefrontController::class, 'index'])->name('home');
 Route::get('/search/suggest', SearchSuggestController::class)->name('search.suggest');
 Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
+Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
+Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
 
 // Report (public can submit, user_id nullable)
 Route::post('/report', [ReportController::class, 'store'])
@@ -186,6 +190,7 @@ Route::middleware(['auth'])->group(function () {
 
         // product variants
         Route::get('/products/{product}/variants', [SellerProductVariant::class,'index'])->name('products.variants.index');
+        Route::post('/products/{product}/variants/generate', [SellerProductVariant::class,'generate'])->name('products.variants.generate');
         Route::post('/products/{product}/variants', [SellerProductVariant::class,'store'])->name('products.variants.store');
         Route::post('/products/{product}/variants/{variant}', [SellerProductVariant::class,'update'])->name('products.variants.update');
         Route::delete('/products/{product}/variants/{variant}', [SellerProductVariant::class,'destroy'])->name('products.variants.destroy');
@@ -216,6 +221,13 @@ Route::middleware(['auth'])->group(function () {
         // KYC
         Route::get('/kyc', [SellerKyc::class, 'edit'])->name('kyc.edit');
         Route::post('/kyc', [SellerKyc::class, 'update'])->name('kyc.update');
+
+        // live streaming
+        Route::get('/live', [SellerLiveStream::class, 'index'])->name('live.index');
+        Route::get('/live/create', [SellerLiveStream::class, 'create'])->name('live.create');
+        Route::post('/live', [SellerLiveStream::class, 'store'])->name('live.store');
+        Route::get('/live/{live}', [SellerLiveStream::class, 'show'])->name('live.show');
+        Route::post('/live/{live}/status', [SellerLiveStream::class, 'updateStatus'])->name('live.status');
     });
 
     // admin

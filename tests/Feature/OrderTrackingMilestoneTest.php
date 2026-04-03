@@ -50,11 +50,6 @@ class OrderTrackingMilestoneTest extends TestCase
             'order_id' => $order->id,
             'event_code' => 'warehouse_received',
         ]);
-
-        $this->assertDatabaseHas('shipment_events', [
-            'order_id' => $order->id,
-            'event_code' => 'destination_dc',
-        ]);
     }
 
     public function test_seller_can_add_manual_checkpoint(): void

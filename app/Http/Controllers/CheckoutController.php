@@ -32,7 +32,7 @@ class CheckoutController extends Controller
     public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $cart->items()->with('product.shop', 'variant')->get();
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -196,7 +196,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $cart->items()->with('product.shop', 'variant')->get();
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -215,7 +215,8 @@ class CheckoutController extends Controller
 
             // cek stok final
             foreach ($items as $it) {
-                if ((int)$it->product->stock < (int)$it->qty) {
+                $availableStock = $it->variant ? (int)$it->variant->stock : (int)$it->product->stock;
+                if ($availableStock < (int)$it->qty) {
                     abort(400, 'Stok berubah, silakan refresh.');
                 }
             }
@@ -411,6 +412,9 @@ class CheckoutController extends Controller
                         'order_id' => $order->id,
                         'product_id' => $it->product->id,
                         'product_name' => $it->product->name,
+                        'product_variant_id' => $it->variant?->id,
+                        'variant_name' => $it->variant?->name,
+                        'sku' => $it->variant?->sku,
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -423,6 +427,9 @@ class CheckoutController extends Controller
                     }
 
                     $it->product->decrement('stock', (int)$it->qty);
+                    if ($it->variant) {
+                        $it->variant->decrement('stock', (int)$it->qty);
+                    }
                 }
 
                 // auto thank-you message

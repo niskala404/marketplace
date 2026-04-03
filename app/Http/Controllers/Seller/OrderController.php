@@ -66,8 +66,6 @@ class OrderController extends Controller
                 $order->logShipmentEvent('processing', 'Pesanan diproses', 'Penjual sedang menyiapkan pesanan.');
             }
             if ($order->status === 'shipped') {
-                $desc = $order->tracking_no ? ('Nomor resi: '.$order->tracking_no) : null;
-                $order->logShipmentEvent('shipped', 'Pesanan dikirim', $desc, now(), 'shipped');
                 $trackingMilestones->seedShippedMilestones($order);
             }
             if ($order->status === 'completed') {

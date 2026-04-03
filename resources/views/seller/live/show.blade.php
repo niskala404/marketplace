@@ -1,0 +1,35 @@
+@extends('layouts.market')
+
+@section('content')
+<div class="flex items-center justify-between mb-4">
+  <div>
+    <h1 class="text-2xl font-black">{{ $live->title }}</h1>
+    <div class="text-sm text-slate-500">Status: {{ strtoupper($live->status) }}</div>
+  </div>
+  <a href="{{ route('seller.live.index') }}" class="px-4 py-2 rounded-xl bg-slate-900 text-white">Kembali</a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 bg-white border rounded-2xl p-5">
+    <div class="aspect-video rounded-2xl overflow-hidden bg-black">
+      @if($live->stream_url)
+        <iframe src="{{ $live->stream_url }}" class="w-full h-full" allowfullscreen></iframe>
+      @else
+        <div class="w-full h-full flex items-center justify-center text-white">Belum ada URL stream</div>
+      @endif
+    </div>
+    <div class="mt-4 text-slate-700 whitespace-pre-line">{{ $live->description }}</div>
+  </div>
+
+  <div class="bg-white border rounded-2xl p-5">
+    <div class="font-bold mb-2">Produk yang ditampilkan</div>
+    <div class="space-y-2">
+      @forelse($live->products as $p)
+        <div class="text-sm border rounded-xl p-2">{{ $p->name }}</div>
+      @empty
+        <div class="text-sm text-slate-500">Belum ada produk.</div>
+      @endforelse
+    </div>
+  </div>
+</div>
+@endsection

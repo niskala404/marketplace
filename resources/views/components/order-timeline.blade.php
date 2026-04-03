@@ -32,6 +32,7 @@
         'line_haul' => 'truck',
         'destination_dc' => 'package',
         'courier_delivery' => 'truck',
+        'custom_checkpoint' => 'map-pin',
         'delivered' => 'map-pin',
         'received' => 'check',
         'completed' => 'check',

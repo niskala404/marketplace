@@ -85,7 +85,8 @@
 
         <div>
             <label class="font-semibold">Gambar (opsional, bisa banyak)</label>
-            <input type="file" name="images[]" multiple class="w-full">
+            <input type="file" id="imagesInput" name="images[]" multiple class="w-full" accept="image/*">
+            <div id="imagePreview" class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2"></div>
         </div>
 
         <label class="inline-flex items-center gap-2">
@@ -96,4 +97,34 @@
         <button class="w-full px-4 py-3 rounded-xl bg-rose-600 text-white font-black">Simpan</button>
     </form>
 </div>
+
+<script>
+(() => {
+  const input = document.getElementById('imagesInput');
+  const preview = document.getElementById('imagePreview');
+  if (!input || !preview) return;
+
+  input.addEventListener('change', () => {
+    preview.innerHTML = '';
+    [...input.files].forEach((file, idx) => {
+      if (!file.type.startsWith('image/')) return;
+      const url = URL.createObjectURL(file);
+      const card = document.createElement('div');
+      card.className = 'relative border rounded-xl overflow-hidden';
+      card.innerHTML = `<img src=\"${url}\" class=\"w-full aspect-square object-cover\"><button type=\"button\" data-index=\"${idx}\" class=\"remove-image absolute top-1 right-1 bg-white/90 border rounded px-2\">✕</button>`;
+      preview.appendChild(card);
+    });
+
+    preview.querySelectorAll('.remove-image').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const removeIndex = Number(btn.dataset.index);
+        const dt = new DataTransfer();
+        [...input.files].forEach((f, i) => { if (i !== removeIndex) dt.items.add(f); });
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+      });
+    });
+  });
+})();
+</script>
 @endsection

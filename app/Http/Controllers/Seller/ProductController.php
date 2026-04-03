@@ -117,7 +117,13 @@ class ProductController extends Controller
             $i = 0;
             foreach ($request->file('images') as $img) {
                 $path = $img->store('products', 'public');
-                ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort_order' => $i++]);
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'image_path' => $path,
+                    'is_primary' => $i === 0,
+                    'sort_order' => $i++,
+                ]);
             }
         }
 
@@ -168,7 +174,13 @@ class ProductController extends Controller
             $i = ($product->images()->max('sort_order') ?? 0) + 1;
             foreach ($request->file('images') as $img) {
                 $path = $img->store('products', 'public');
-                ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort_order' => $i++]);
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'path' => $path,
+                    'image_path' => $path,
+                    'is_primary' => false,
+                    'sort_order' => $i++,
+                ]);
             }
         }
 

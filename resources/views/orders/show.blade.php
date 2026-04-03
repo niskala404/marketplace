@@ -131,7 +131,13 @@
                 @foreach($order->items as $it)
                     <div class="border rounded-2xl p-4">
                         <div class="flex items-center justify-between">
-                            <div class="text-sm font-semibold">{{ $it->product_name }} × {{ $it->qty }}</div>
+                            <div class="text-sm font-semibold">
+                                {{ $it->product_name }}
+                                @if($it->variant_name)
+                                    <span class="text-xs text-slate-500">({{ $it->variant_name }})</span>
+                                @endif
+                                × {{ $it->qty }}
+                            </div>
                             <div class="font-black text-rose-600">Rp {{ number_format($it->line_total,0,',','.') }}</div>
                         </div>
 

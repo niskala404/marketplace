@@ -90,7 +90,13 @@
     <div class="mt-2 space-y-2">
         @foreach($order->items as $it)
             <div class="flex justify-between text-sm">
-                <div>{{ $it->product_name }} × {{ $it->qty }}</div>
+                <div>
+                    {{ $it->product_name }}
+                    @if($it->variant_name)
+                        <span class="text-xs text-slate-500">({{ $it->variant_name }})</span>
+                    @endif
+                    × {{ $it->qty }}
+                </div>
                 <div class="font-semibold">Rp {{ number_format($it->line_total,0,',','.') }}</div>
             </div>
         @endforeach
