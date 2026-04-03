@@ -4,19 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ProductVariant extends Model
+class ProductVariantOption extends Model
 {
     protected $fillable = [
         'product_id',
         'name',
-        'sku',
-        'price',
-        'stock',
-        'is_active',
-    ];
-
-    protected $casts = [
-        'is_active' => 'boolean',
+        'sort_order',
     ];
 
     public function product()
@@ -27,10 +20,5 @@ class ProductVariant extends Model
     public function items()
     {
         return $this->hasMany(ProductVariantItem::class);
-    }
-
-    public function effectivePrice(): int
-    {
-        return (int)($this->price ?? $this->product?->price ?? 0);
     }
 }

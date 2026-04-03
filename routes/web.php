@@ -14,6 +14,7 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\Payments\MidtransController as MidtransPayment;
 use App\Http\Controllers\AffiliateController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\LiveStreamController;
 
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\FollowController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Seller\ProductVariantController as SellerProductVariant
 use App\Http\Controllers\Seller\ProductImageController as SellerProductImage;
 use App\Http\Controllers\Seller\BoostController as SellerBoost;
 use App\Http\Controllers\Seller\KycController as SellerKyc;
+use App\Http\Controllers\Seller\LiveStreamController as SellerLiveStream;
 use App\Http\Controllers\Admin\FlashSaleController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\CategoryController as AdminCategory;
@@ -57,9 +59,13 @@ Route::get('/', [StorefrontController::class, 'index'])->name('home');
 Route::get('/search/suggest', SearchSuggestController::class)->name('search.suggest');
 Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
+Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
+Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
 
 // Report (public can submit, user_id nullable)
-Route::post('/report', [ReportController::class, 'store'])->name('report.store');
+Route::post('/report', [ReportController::class, 'store'])
+    ->middleware('throttle:public-report')
+    ->name('report.store');
 
 Route::middleware(['auth'])->group(function () {
 
@@ -73,28 +79,50 @@ Route::middleware(['auth'])->group(function () {
 
     // follow shops
     Route::get('/following', [FollowController::class, 'index'])->name('followings.index');
-    Route::post('/shops/{shop}/follow', [FollowController::class, 'toggle'])->name('shops.follow.toggle');
+    Route::post('/shops/{shop}/follow', [FollowController::class, 'toggle'])
+        ->middleware('throttle:marketplace-write')
+        ->name('shops.follow.toggle');
 
     // messages (buyer)
     Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
     Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
     Route::get('/messages/{conversation}/poll', [MessageController::class, 'poll'])->name('messages.poll');
-    Route::post('/messages/{conversation}', [MessageController::class, 'send'])->name('messages.send');
-    Route::post('/shops/{shop}/message', [MessageController::class, 'start'])->name('messages.start');
+    Route::post('/messages/{conversation}', [MessageController::class, 'send'])
+        ->middleware('throttle:marketplace-write')
+        ->name('messages.send');
+    Route::post('/shops/{shop}/message', [MessageController::class, 'start'])
+        ->middleware('throttle:marketplace-write')
+        ->name('messages.start');
 
     // wishlist
     Route::get('/wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
-    Route::post('/wishlist/toggle/{product}', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
+    Route::post('/wishlist/move-all', [WishlistController::class, 'moveAllToCart'])
+        ->middleware('throttle:marketplace-write')
+        ->name('wishlist.move_all');
+    Route::post('/wishlist/{product}/move-to-cart', [WishlistController::class, 'moveToCart'])
+        ->middleware('throttle:marketplace-write')
+        ->name('wishlist.move_to_cart');
+    Route::post('/wishlist/toggle/{product}', [WishlistController::class, 'toggle'])
+        ->middleware('throttle:marketplace-write')
+        ->name('wishlist.toggle');
 
     // cart
     Route::get('/cart', [CartController::class,'index'])->name('cart.index');
-    Route::post('/cart/add/{productId}', [CartController::class,'add'])->name('cart.add');
-    Route::post('/cart/update/{itemId}', [CartController::class,'update'])->name('cart.update');
-    Route::post('/cart/remove/{itemId}', [CartController::class,'remove'])->name('cart.remove');
+    Route::post('/cart/add/{productId}', [CartController::class,'add'])
+        ->middleware('throttle:marketplace-write')
+        ->name('cart.add');
+    Route::post('/cart/update/{itemId}', [CartController::class,'update'])
+        ->middleware('throttle:marketplace-write')
+        ->name('cart.update');
+    Route::post('/cart/remove/{itemId}', [CartController::class,'remove'])
+        ->middleware('throttle:marketplace-write')
+        ->name('cart.remove');
 
     // checkout + orders
     Route::get('/checkout', [CheckoutController::class,'show'])->name('checkout.show');
-    Route::post('/checkout', [CheckoutController::class,'place'])->name('checkout.place');
+    Route::post('/checkout', [CheckoutController::class,'place'])
+        ->middleware('throttle:marketplace-write')
+        ->name('checkout.place');
 
     // wallet
     Route::get('/my-wallet', [WalletController::class, 'index'])->name('wallet.index');
@@ -102,15 +130,25 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/my-orders', [CheckoutController::class,'myOrders'])->name('orders.mine');
     Route::get('/my-orders/{order}', [CheckoutController::class,'showOrder'])->name('orders.show');
     Route::get('/my-orders/{order}/pay', [MidtransPayment::class,'pay'])->name('payments.midtrans.pay');
-    Route::post('/my-orders/{order}/cancel', [CheckoutController::class,'cancel'])->name('orders.cancel');
-    Route::post('/my-orders/{order}/confirm-received', [CheckoutController::class,'confirmReceived'])->name('orders.confirm_received');
-    Route::post('/my-orders/{order}/payment-proof', [PaymentProofController::class,'upload'])->name('orders.payment_proof.upload');
-    Route::post('/my-orders/{order}/items/{orderItem}/review', [ReviewController::class,'store'])->name('orders.items.review');
+    Route::post('/my-orders/{order}/cancel', [CheckoutController::class,'cancel'])
+        ->middleware('throttle:marketplace-write')
+        ->name('orders.cancel');
+    Route::post('/my-orders/{order}/confirm-received', [CheckoutController::class,'confirmReceived'])
+        ->middleware('throttle:marketplace-write')
+        ->name('orders.confirm_received');
+    Route::post('/my-orders/{order}/payment-proof', [PaymentProofController::class,'upload'])
+        ->middleware('throttle:marketplace-write')
+        ->name('orders.payment_proof.upload');
+    Route::post('/my-orders/{order}/items/{orderItem}/review', [ReviewController::class,'store'])
+        ->middleware('throttle:marketplace-write')
+        ->name('orders.items.review');
 
     // disputes (buyer)
     Route::get('/disputes', [BuyerDispute::class, 'index'])->name('disputes.index');
     Route::get('/orders/{order}/dispute', [BuyerDispute::class, 'create'])->name('disputes.create');
-    Route::post('/orders/{order}/dispute', [BuyerDispute::class, 'store'])->name('disputes.store');
+    Route::post('/orders/{order}/dispute', [BuyerDispute::class, 'store'])
+        ->middleware('throttle:marketplace-write')
+        ->name('disputes.store');
     Route::get('/disputes/{dispute}', [BuyerDispute::class, 'show'])->name('disputes.show');
     Route::post('/disputes/{dispute}/ship-back', [BuyerDispute::class, 'shipBack'])->name('disputes.ship_back');
 
@@ -152,6 +190,7 @@ Route::middleware(['auth'])->group(function () {
 
         // product variants
         Route::get('/products/{product}/variants', [SellerProductVariant::class,'index'])->name('products.variants.index');
+        Route::post('/products/{product}/variants/generate', [SellerProductVariant::class,'generate'])->name('products.variants.generate');
         Route::post('/products/{product}/variants', [SellerProductVariant::class,'store'])->name('products.variants.store');
         Route::post('/products/{product}/variants/{variant}', [SellerProductVariant::class,'update'])->name('products.variants.update');
         Route::delete('/products/{product}/variants/{variant}', [SellerProductVariant::class,'destroy'])->name('products.variants.destroy');
@@ -160,6 +199,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/orders/{order}', [SellerOrder::class,'show'])->name('orders.show');
         Route::post('/orders/{order}/status', [SellerOrder::class,'updateStatus'])->name('orders.status');
         Route::post('/orders/{order}/delivered', [SellerOrder::class,'markDelivered'])->name('orders.delivered');
+        Route::post('/orders/{order}/checkpoint', [SellerOrder::class,'addCheckpoint'])->name('orders.checkpoint');
 
         // disputes (seller)
         Route::get('/disputes', [SellerDispute::class, 'index'])->name('disputes.index');
@@ -181,6 +221,13 @@ Route::middleware(['auth'])->group(function () {
         // KYC
         Route::get('/kyc', [SellerKyc::class, 'edit'])->name('kyc.edit');
         Route::post('/kyc', [SellerKyc::class, 'update'])->name('kyc.update');
+
+        // live streaming
+        Route::get('/live', [SellerLiveStream::class, 'index'])->name('live.index');
+        Route::get('/live/create', [SellerLiveStream::class, 'create'])->name('live.create');
+        Route::post('/live', [SellerLiveStream::class, 'store'])->name('live.store');
+        Route::get('/live/{live}', [SellerLiveStream::class, 'show'])->name('live.show');
+        Route::post('/live/{live}/status', [SellerLiveStream::class, 'updateStatus'])->name('live.status');
     });
 
     // admin

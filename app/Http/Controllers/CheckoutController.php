@@ -32,7 +32,7 @@ class CheckoutController extends Controller
     public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $cart->items()->with('product.shop', 'variant')->get();
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -196,7 +196,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $cart->items()->with('product.shop', 'variant')->get();
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -215,7 +215,8 @@ class CheckoutController extends Controller
 
             // cek stok final
             foreach ($items as $it) {
-                if ((int)$it->product->stock < (int)$it->qty) {
+                $availableStock = $it->variant ? (int)$it->variant->stock : (int)$it->product->stock;
+                if ($availableStock < (int)$it->qty) {
                     abort(400, 'Stok berubah, silakan refresh.');
                 }
             }
@@ -251,8 +252,12 @@ class CheckoutController extends Controller
                 'province' => $address->province,
                 'city' => $address->city,
                 'district' => $address->district,
+                'village' => $address->village,
                 'postal_code' => $address->postal_code,
                 'full_address' => $address->full_address,
+                'detail_address' => $address->detail_address,
+                'latitude' => $address->latitude,
+                'longitude' => $address->longitude,
             ], JSON_UNESCAPED_UNICODE);
 
             // 1) Pre-calc per shop subtotal, shipping, and shop voucher
@@ -365,6 +370,24 @@ class CheckoutController extends Controller
                     'shipping_address_snapshot' => $addressSnapshot,
                 ]);
 
+                $order->logShipmentEvent(
+                    'pending',
+                    'Pesanan dibuat',
+                    'Pesanan berhasil dibuat dan menunggu proses pembayaran.',
+                    now(),
+                    'order_created'
+                );
+
+                if ($order->status === 'processing') {
+                    $order->logShipmentEvent(
+                        'processing',
+                        'Pesanan diproses',
+                        'Pembayaran COD, pesanan langsung diproses penjual.',
+                        now(),
+                        'processing'
+                    );
+                }
+
                 // redeem shop voucher
                 if ($c['shopVoucherModel'] && (int)$c['shopDiscount'] > 0) {
                     $vouchers->redeem($c['shopVoucherModel'], $user->id, (int)$order->id, (int)$c['shopDiscount']);
@@ -389,6 +412,9 @@ class CheckoutController extends Controller
                         'order_id' => $order->id,
                         'product_id' => $it->product->id,
                         'product_name' => $it->product->name,
+                        'product_variant_id' => $it->variant?->id,
+                        'variant_name' => $it->variant?->name,
+                        'sku' => $it->variant?->sku,
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -401,6 +427,9 @@ class CheckoutController extends Controller
                     }
 
                     $it->product->decrement('stock', (int)$it->qty);
+                    if ($it->variant) {
+                        $it->variant->decrement('stock', (int)$it->qty);
+                    }
                 }
 
                 // auto thank-you message
@@ -456,7 +485,7 @@ class CheckoutController extends Controller
     public function showOrder(Request $request, Order $order)
     {
         abort_if($order->user_id !== $request->user()->id, 403);
-        $order->load(['shop', 'items.product', 'items.review', 'dispute']);
+        $order->load(['shop', 'items.product', 'items.review', 'dispute', 'shipmentEvents']);
         return view('orders.show', compact('order'));
     }
 
@@ -479,6 +508,8 @@ class CheckoutController extends Controller
                 'received_at' => $fresh->received_at ?: now(),
                 'completed_at' => $fresh->completed_at ?: now(),
             ])->save();
+            $fresh->logShipmentEvent('completed', 'Pesanan diterima pembeli', 'Pembeli sudah mengonfirmasi paket diterima.', now(), 'received');
+            $fresh->logShipmentEvent('completed', 'Pesanan selesai', 'Transaksi selesai dan dana diproses ke penjual.', now(), 'completed');
 
             $fresh->settleCommissionIfNeeded();
         });
@@ -522,6 +553,7 @@ class CheckoutController extends Controller
                 'cancelled_at' => now(),
                 'cancel_reason' => 'buyer_cancelled',
             ])->save();
+            $locked->logShipmentEvent('cancelled', 'Pesanan dibatalkan pembeli', 'Pesanan dibatalkan sebelum pembayaran diverifikasi.', now(), 'cancelled');
         });
 
         $order->refresh()->loadMissing(['shop.user', 'user']);
