@@ -62,6 +62,10 @@ Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show'
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
 Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
 Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
+Route::get('/live/{live}/comments/poll', [LiveStreamController::class, 'pollComments'])->name('live.comments.poll');
+Route::post('/live/{live}/comment', [LiveStreamController::class, 'comment'])->middleware('auth')->name('live.comment');
+Route::post('/live/{live}/like', [LiveStreamController::class, 'like'])->middleware('auth')->name('live.like');
+Route::post('/live/{live}/share', [LiveStreamController::class, 'share'])->name('live.share');
 
 // Public report submit
 Route::post('/report', [ReportController::class, 'store'])
@@ -232,6 +236,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/live', [SellerLiveStream::class, 'store'])->name('live.store');
         Route::get('/live/{live}', [SellerLiveStream::class, 'show'])->name('live.show');
         Route::post('/live/{live}/status', [SellerLiveStream::class, 'updateStatus'])->name('live.status');
+        Route::post('/live/{live}/products', [SellerLiveStream::class, 'updateProducts'])->name('live.products');
     });
 
     // Admin
