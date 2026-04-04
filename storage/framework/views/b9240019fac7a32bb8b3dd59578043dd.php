@@ -2,6 +2,7 @@
 <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-black">Produk Saya</h1>
     <div class="flex items-center gap-2">
+        <a class="px-4 py-3 rounded-xl border font-bold" href="<?php echo e(route('seller.live.index')); ?>">Live Streaming</a>
         <a class="px-4 py-3 rounded-xl bg-slate-900 text-white font-bold" href="<?php echo e(route('seller.products.bulk')); ?>">Bulk Tools</a>
         <a class="px-4 py-3 rounded-xl bg-rose-600 text-white font-bold" href="<?php echo e(route('seller.products.create')); ?>">+ Produk</a>
     </div>
@@ -23,6 +24,7 @@
                     <?php endif; ?>
                 </div>
                 <div class="flex gap-2">
+                    <a class="px-3 py-2 rounded-xl border" href="<?php echo e(route('seller.products.variants.index',$p)); ?>">Varian</a>
                     <a class="px-3 py-2 rounded-xl bg-slate-900 text-white" href="<?php echo e(route('seller.products.edit',$p)); ?>">Edit</a>
                     <form method="POST" action="<?php echo e(route('seller.products.destroy',$p)); ?>">
                         <?php echo csrf_field(); ?> <?php echo method_field('DELETE'); ?>

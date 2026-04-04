@@ -21,7 +21,14 @@ class CartController extends Controller
 
         $subtotal = $items->sum(function ($it) use ($flashPriceMap) {
             $p = $it->product;
-            $unit = $flashPriceMap[$p->id] ?? (method_exists($p, 'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
+            // Prioritas: flash sale → harga variant → harga produk (discounted)
+            if (array_key_exists($p->id, $flashPriceMap)) {
+                $unit = (int) $flashPriceMap[$p->id];
+            } elseif ($it->variant && $it->variant->price !== null) {
+                $unit = (int) $it->variant->price;
+            } else {
+                $unit = method_exists($p, 'discountedPrice') ? (int) $p->discountedPrice() : (int) $p->price;
+            }
             return $unit * (int)$it->qty;
         });
 

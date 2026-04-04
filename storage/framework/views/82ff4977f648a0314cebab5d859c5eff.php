@@ -229,6 +229,31 @@
 <?php endif; ?>
                 </a>
 
+                <?php if(auth()->user()->role === 'seller' && Route::has('seller.live.index')): ?>
+                    <a href="<?php echo e(route('seller.live.index')); ?>" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Live Seller" aria-label="Live Seller">
+                        <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ic','data' => ['name' => 'video','class' => 'w-5 h-5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ic'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'video','class' => 'w-5 h-5']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal16783dc90daf260581c0ddf14436b31a)): ?>
+<?php $attributes = $__attributesOriginal16783dc90daf260581c0ddf14436b31a; ?>
+<?php unset($__attributesOriginal16783dc90daf260581c0ddf14436b31a); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal16783dc90daf260581c0ddf14436b31a)): ?>
+<?php $component = $__componentOriginal16783dc90daf260581c0ddf14436b31a; ?>
+<?php unset($__componentOriginal16783dc90daf260581c0ddf14436b31a); ?>
+<?php endif; ?>
+                    </a>
+                <?php endif; ?>
+
                 <a href="<?php echo e(route('account.profile')); ?>" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Akun" aria-label="Akun">
                     <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
@@ -664,4 +689,5 @@
 </script>
 
 </body>
-</html><?php /**PATH C:\laragon\www\ilmishop\resources\views/layouts/market.blade.php ENDPATH**/ ?>
+</html>
+<?php /**PATH C:\laragon\www\ilmishop\resources\views/layouts/market.blade.php ENDPATH**/ ?>

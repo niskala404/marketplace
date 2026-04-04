@@ -15,23 +15,29 @@ class ShippingCalculator
     }
 
     /**
+     * Hitung total berat dari cart items.
+     */
+    protected function calcTotalWeight(Collection $cartItems): int
+    {
+        $total = 0;
+        foreach ($cartItems as $it) {
+            $total += (int) ($it->product->weight_grams ?? 500) * (int) $it->qty;
+        }
+        return $total;
+    }
+
+    /**
      * Return a list of shipping options for a given address + items.
-     * This is a demo abstraction (no external courier API yet).
      */
     public function options(Address $address, Collection $cartItems): array
     {
-        // If RajaOngkir is configured and we have city IDs for origin+destination, query real courier costs.
-        $originCityId = (int) optional($cartItems->first()?->product?->shop)->origin_city_id;
+        $originCityId      = (int) optional($cartItems->first()?->product?->shop)->origin_city_id;
         $destinationCityId = (int) ($address->rajaongkir_city_id ?? 0);
 
         if ($this->rajaOngkir->enabled() && $originCityId > 0 && $destinationCityId > 0) {
-            $totalWeight = 0;
-            foreach ($cartItems as $it) {
-                $w = (int)($it->product->weight_grams ?? 500);
-                $totalWeight += $w * (int)$it->qty;
-            }
+            $totalWeight = $this->calcTotalWeight($cartItems);
+            $couriers    = (array) config('ilmishop.rajaongkir.couriers', ['jne', 'pos', 'tiki']);
 
-            $couriers = (array) config('ilmishop.rajaongkir.couriers', ['jne','pos','tiki']);
             try {
                 $options = $this->rajaOngkir->getCosts($originCityId, $destinationCityId, $totalWeight, $couriers);
                 if (!empty($options)) {
@@ -42,70 +48,64 @@ class ShippingCalculator
             }
         }
 
-        // Fallback: demo abstraction (no external courier API).
+        // Fallback: demo abstraction
         $base = $this->calculate($address, $cartItems);
-        $fee = (int) $base['fee'];
+        $fee  = (int) $base['fee'];
 
-        // Multipliers are demo defaults.
         return [
             [
-                "code" => "economy",
-                "label" => "Ekonomi",
-                "courier" => "ILMI",
-                "service" => "Economy",
-                "etd" => "4-8 hari",
-                "fee" => max(0, (int) floor($fee * 0.8)),
+                'code'    => 'economy',
+                'label'   => 'Ekonomi',
+                'courier' => 'ILMI',
+                'service' => 'Economy',
+                'etd'     => '4-8 hari',
+                'fee'     => max(0, (int) floor($fee * 0.8)),
             ],
             [
-                "code" => "regular",
-                "label" => "Reguler",
-                "courier" => "ILMI",
-                "service" => "Regular",
-                "etd" => "2-5 hari",
-                "fee" => $fee,
+                'code'    => 'regular',
+                'label'   => 'Reguler',
+                'courier' => 'ILMI',
+                'service' => 'Regular',
+                'etd'     => '2-5 hari',
+                'fee'     => $fee,
             ],
             [
-                "code" => "express",
-                "label" => "Express",
-                "courier" => "ILMI",
-                "service" => "Express",
-                "etd" => "1-3 hari",
-                "fee" => (int) ceil($fee * 1.5),
+                'code'    => 'express',
+                'label'   => 'Express',
+                'courier' => 'ILMI',
+                'service' => 'Express',
+                'etd'     => '1-3 hari',
+                'fee'     => (int) ceil($fee * 1.5),
             ],
         ];
     }
 
-    /** /**
-     * @param Address $address
-     * @param Collection $cartItems collection of CartItem with loaded product
+    /**
+     * Calculate base shipping cost for address + cart items.
+     *
+     * @param Address    $address
+     * @param Collection $cartItems Collection of CartItem with loaded product
      */
     public function calculate(Address $address, Collection $cartItems): array
     {
-        $totalWeight = 0;
-        foreach ($cartItems as $it) {
-            $w = (int)($it->product->weight_grams ?? 500);
-            $totalWeight += $w * (int)$it->qty;
-        }
-
-        $rate = $this->resolveRate($address);
-
-        $kgUnits = (int) max(1, (int) ceil($totalWeight / 1000));
-        $fee = (int)$rate->base_fee + (int)$rate->per_kg_fee * $kgUnits;
+        $totalWeight = $this->calcTotalWeight($cartItems);
+        $rate        = $this->resolveRate($address);
+        $kgUnits     = (int) max(1, (int) ceil($totalWeight / 1000));
+        $fee         = (int) $rate->base_fee + (int) $rate->per_kg_fee * $kgUnits;
 
         return [
-            'rate' => $rate,
+            'rate'               => $rate,
             'total_weight_grams' => $totalWeight,
-            'kg_units' => $kgUnits,
-            'fee' => $fee,
+            'kg_units'           => $kgUnits,
+            'fee'                => $fee,
         ];
     }
 
     protected function resolveRate(Address $address): ShippingRate
     {
-        $province = trim((string)($address->province ?? ''));
-        $city = trim((string)($address->city ?? ''));
+        $province = trim((string) ($address->province ?? ''));
+        $city     = trim((string) ($address->city ?? ''));
 
-        // Priority: city match, then province match, else default
         $q = ShippingRate::query()->where('is_active', true);
 
         if ($city !== '') {
@@ -121,14 +121,13 @@ class ShippingCalculator
         $default = (clone $q)->whereNull('province')->whereNull('city')->first();
         if ($default) return $default;
 
-        // fallback instance
         return new ShippingRate([
-            'name' => 'Default',
-            'province' => null,
-            'city' => null,
-            'base_fee' => 15000,
+            'name'       => 'Default',
+            'province'   => null,
+            'city'       => null,
+            'base_fee'   => 15000,
             'per_kg_fee' => 0,
-            'is_active' => true,
+            'is_active'  => true,
         ]);
     }
 }

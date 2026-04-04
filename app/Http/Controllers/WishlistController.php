@@ -14,7 +14,7 @@ class WishlistController extends Controller
     public function index(Request $request)
     {
         $products = $request->user()->wishlistProducts()
-            ->with(['shop','images'])
+            ->with(['shop', 'images'])
             ->latest('wishlist_items.created_at')
             ->paginate(12);
 
@@ -37,7 +37,7 @@ class WishlistController extends Controller
         }
 
         WishlistItem::create([
-            'user_id' => $userId,
+            'user_id'    => $userId,
             'product_id' => $product->id,
         ]);
 
@@ -56,17 +56,23 @@ class WishlistController extends Controller
             return back()->with('error', 'Produk tidak ditemukan di wishlist.');
         }
 
+        // Produk dengan varian harus pilih varian dulu di halaman produk
+        if ($product->variants()->where('is_active', true)->exists()) {
+            return redirect()->route('products.show', $product->slug)
+                ->with('info', 'Produk ini memiliki varian. Silakan pilih varian terlebih dahulu di halaman produk.');
+        }
+
         if (!$product->is_active || $product->stock < 1) {
             return back()->with('error', 'Produk tidak tersedia atau stok habis.');
         }
-
 
         DB::transaction(function () use ($user, $product, $wishlistItem) {
             $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
             $cartItem = CartItem::firstOrCreate([
-                'cart_id' => $cart->id,
-                'product_id' => $product->id,
+                'cart_id'            => $cart->id,
+                'product_id'         => $product->id,
+                'product_variant_id' => null,
             ], [
                 'qty' => 0,
             ]);
@@ -91,7 +97,7 @@ class WishlistController extends Controller
             return back()->with('error', 'Wishlist masih kosong.');
         }
 
-        $moved = 0;
+        $moved   = 0;
         $skipped = 0;
 
         DB::transaction(function () use ($user, $wishlistItems, &$moved, &$skipped) {
@@ -99,15 +105,22 @@ class WishlistController extends Controller
 
             foreach ($wishlistItems as $wishlistItem) {
                 $product = $wishlistItem->product;
+
                 if (!$product || !$product->is_active || $product->stock < 1) {
                     $skipped++;
                     continue;
                 }
 
+                // Skip produk bervarian — harus pilih varian dulu
+                if ($product->variants()->where('is_active', true)->exists()) {
+                    $skipped++;
+                    continue;
+                }
 
                 $cartItem = CartItem::firstOrCreate([
-                    'cart_id' => $cart->id,
-                    'product_id' => $product->id,
+                    'cart_id'            => $cart->id,
+                    'product_id'         => $product->id,
+                    'product_variant_id' => null,
                 ], [
                     'qty' => 0,
                 ]);
@@ -129,7 +142,7 @@ class WishlistController extends Controller
 
         $message = "Berhasil memindahkan {$moved} produk ke keranjang.";
         if ($skipped > 0) {
-            $message .= " {$skipped} produk dilewati (stok habis/tidak aktif).";
+            $message .= " {$skipped} produk dilewati (stok habis, tidak aktif, atau perlu pilih varian).";
         }
 
         return back()->with('success', $message);

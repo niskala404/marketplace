@@ -41,12 +41,31 @@ unset($__defined_vars, $__key, $__value); ?>
         ])->filter()->map(function ($e) {
             return (object)[
                 'status' => $e['status'],
+                'event_code' => $e['status'],
                 'title' => $e['title'],
                 'description' => $e['desc'],
+                'location' => null,
                 'happened_at' => $e['at'],
             ];
         });
     }
+
+    $iconByCode = [
+        'order_created' => 'check',
+        'paid' => 'check',
+        'processing' => 'package',
+        'shipped' => 'truck',
+        'warehouse_received' => 'package',
+        'sorting_center' => 'package',
+        'line_haul' => 'truck',
+        'destination_dc' => 'package',
+        'courier_delivery' => 'truck',
+        'custom_checkpoint' => 'map-pin',
+        'delivered' => 'map-pin',
+        'received' => 'check',
+        'completed' => 'check',
+        'cancelled' => 'circle-x',
+    ];
 ?>
 
 <div class="bg-white border rounded-2xl p-5">
@@ -67,14 +86,14 @@ unset($__defined_vars, $__key, $__value); ?>
                         <span class="absolute -start-3 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white shadow">
                             <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ic','data' => ['name' => 'check','class' => 'w-4 h-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ic','data' => ['name' => $iconByCode[$ev->event_code ?? $ev->status] ?? 'check','class' => 'w-4 h-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ic'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['name' => 'check','class' => 'w-4 h-4']); ?>
+<?php $component->withAttributes(['name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($iconByCode[$ev->event_code ?? $ev->status] ?? 'check'),'class' => 'w-4 h-4']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal16783dc90daf260581c0ddf14436b31a)): ?>
@@ -91,6 +110,9 @@ unset($__defined_vars, $__key, $__value); ?>
                                 <div class="font-semibold text-slate-900"><?php echo e($ev->title); ?></div>
                                 <?php if($ev->description): ?>
                                     <div class="text-sm text-slate-600 mt-0.5"><?php echo e($ev->description); ?></div>
+                                <?php endif; ?>
+                                <?php if(!empty($ev->location)): ?>
+                                    <div class="text-xs text-slate-500 mt-1">📍 <?php echo e($ev->location); ?></div>
                                 <?php endif; ?>
                             </div>
                             <div class="text-xs text-slate-500 whitespace-nowrap">

@@ -60,7 +60,14 @@ class CheckoutController extends Controller
 
             $subtotal = $groupItems->sum(function ($it) use ($flashPriceMap) {
                 $p = $it->product;
-                $unit = $flashPriceMap[$p->id] ?? (method_exists($p,'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
+                // Prioritas: flash sale → harga variant → harga produk (discounted)
+                if (array_key_exists($p->id, $flashPriceMap)) {
+                    $unit = (int) $flashPriceMap[$p->id];
+                } elseif ($it->variant && $it->variant->price !== null) {
+                    $unit = (int) $it->variant->price;
+                } else {
+                    $unit = method_exists($p, 'discountedPrice') ? (int) $p->discountedPrice() : (int) $p->price;
+                }
                 return $unit * (int)$it->qty;
             });
 
@@ -267,7 +274,14 @@ class CheckoutController extends Controller
 
                 $subtotal = (int) $shopItems->sum(function ($it) use ($flashPriceMap) {
                     $p = $it->product;
-                    $unit = $flashPriceMap[$p->id] ?? (method_exists($p, 'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
+                    // Prioritas: flash sale → harga variant → harga produk (discounted)
+                    if (array_key_exists($p->id, $flashPriceMap)) {
+                        $unit = (int) $flashPriceMap[$p->id];
+                    } elseif ($it->variant && $it->variant->price !== null) {
+                        $unit = (int) $it->variant->price;
+                    } else {
+                        $unit = method_exists($p, 'discountedPrice') ? (int) $p->discountedPrice() : (int) $p->price;
+                    }
                     return $unit * (int)$it->qty;
                 });
 
@@ -405,8 +419,14 @@ class CheckoutController extends Controller
                 }
 
                 foreach ($shopItems as $it) {
-                    $unit = $flashPriceMap[$it->product->id]
-                        ?? (method_exists($it->product, 'discountedPrice') ? (int)$it->product->discountedPrice() : (int)$it->product->price);
+                    // Prioritas: flash sale → harga variant → harga produk (discounted)
+                    if (array_key_exists($it->product->id, $flashPriceMap)) {
+                        $unit = (int) $flashPriceMap[$it->product->id];
+                    } elseif ($it->variant && $it->variant->price !== null) {
+                        $unit = (int) $it->variant->price;
+                    } else {
+                        $unit = method_exists($it->product, 'discountedPrice') ? (int) $it->product->discountedPrice() : (int) $it->product->price;
+                    }
 
                     OrderItem::create([
                         'order_id' => $order->id,
@@ -461,15 +481,21 @@ class CheckoutController extends Controller
         });
 
         if ($request->payment_method === 'midtrans') {
-            $pending = $user->orders()
+            $pendingOrders = $user->orders()
                 ->where('status', 'pending')
                 ->where('payment_method', 'midtrans')
+                ->whereNull('snap_token')
                 ->latest('id')
-                ->first();
+                ->get();
 
-            if ($pending) {
-                return redirect()->route('payments.midtrans.pay', $pending)
+            if ($pendingOrders->count() === 1) {
+                return redirect()->route('payments.midtrans.pay', $pendingOrders->first())
                     ->with('success', 'Pesanan dibuat. Silakan lanjut bayar.');
+            }
+
+            if ($pendingOrders->count() > 1) {
+                return redirect()->route('orders.mine')
+                    ->with('success', 'Pesanan dibuat untuk ' . $pendingOrders->count() . ' toko. Silakan bayar masing-masing pesanan.');
             }
         }
 
@@ -544,6 +570,12 @@ class CheckoutController extends Controller
 
             foreach ($locked->items as $item) {
                 Product::query()->whereKey($item->product_id)->increment('stock', (int)$item->qty);
+
+                if ($item->product_variant_id) {
+                    \App\Models\ProductVariant::query()
+                        ->whereKey($item->product_variant_id)
+                        ->increment('stock', (int)$item->qty);
+                }
             }
 
             $vouchers->rollbackForOrder((int)$locked->id);
