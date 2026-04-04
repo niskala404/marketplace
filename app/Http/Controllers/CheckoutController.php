@@ -17,6 +17,7 @@ use App\Services\ShippingCalculator;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CheckoutController extends Controller
@@ -56,13 +57,7 @@ class CheckoutController extends Controller
 
         $groups = $items->groupBy(fn($it) => $it->product->shop_id);
 
-        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress, $flashPriceMap, $pricing) {
-            $shop = $groupItems->first()->product->shop;
 
-            $subtotal = $groupItems->sum(function ($it) use ($flashPriceMap, $pricing) {
-                $p = $it->product;
-                $unit = $pricing->resolveUnitPrice($p, $it->variant, $flashPriceMap);
-                return $unit * (int)$it->qty;
             });
 
             $ship = $shipping->calculate($selectedAddress, $groupItems);
@@ -266,10 +261,7 @@ class CheckoutController extends Controller
             foreach ($groups as $shopId => $shopItems) {
                 $shopId = (int) $shopId;
 
-                $subtotal = (int) $shopItems->sum(function ($it) use ($flashPriceMap, $pricing) {
-                    $p = $it->product;
-                    $unit = $pricing->resolveUnitPrice($p, $it->variant, $flashPriceMap);
-                    return $unit * (int)$it->qty;
+
                 });
 
                 $options = $shipping->options($address, $shopItems);
@@ -406,7 +398,7 @@ class CheckoutController extends Controller
                 }
 
                 foreach ($shopItems as $it) {
-                    $unit = $pricing->resolveUnitPrice($it->product, $it->variant, $flashPriceMap);
+
 
                     OrderItem::create([
                         'order_id' => $order->id,
@@ -569,5 +561,6 @@ class CheckoutController extends Controller
 
         return back()->with('success', 'Pesanan berhasil dibatalkan. Stok dikembalikan.');
     }
+
 
 }

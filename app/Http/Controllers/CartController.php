@@ -12,6 +12,7 @@ use App\Models\FlashSaleItem;
 use App\Services\CartPricingService;
 use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CartController extends Controller
 {
@@ -23,10 +24,7 @@ class CartController extends Controller
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
         $flashPriceMap = FlashSaleItem::promoPriceMap($productIds);
 
-        $subtotal = $items->sum(function ($it) use ($flashPriceMap, $pricing) {
-            $p = $it->product;
-            $unit = $pricing->resolveUnitPrice($p, $it->variant, $flashPriceMap);
-            return $unit * (int)$it->qty;
+
         });
 
         return view('cart.index', compact('items','subtotal','flashPriceMap'));
@@ -49,6 +47,9 @@ class CartController extends Controller
 
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
 
+        $flashPriceMap = FlashSaleItem::promoPriceMap([(int) $product->id]);
+        $snapshotPrice = $pricing->resolveUnitPrice($product, $variant, $flashPriceMap);
+
         $item = CartItem::firstOrCreate([
             'cart_id' => $cart->id,
             'product_id' => $product->id,
@@ -67,6 +68,7 @@ class CartController extends Controller
         $item->update([
             'qty' => $newQty,
             'sku_snapshot' => $skuSnapshot,
+
         ]);
 
         if ($request->expectsJson()) {
@@ -123,6 +125,7 @@ class CartController extends Controller
                 if ($item->variant && !$item->sku_snapshot) {
                     $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
                 }
+
                 if (
                     !$item->variant
                     || (int) $item->variant->product_id !== (int) $item->product_id
@@ -138,6 +141,7 @@ class CartController extends Controller
             if ($item->sku_snapshot !== $expectedBaseSku) {
                 $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
             }
+
 
             if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
                 $invalidIds[] = $item->id;

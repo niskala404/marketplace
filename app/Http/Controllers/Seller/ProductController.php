@@ -176,21 +176,6 @@ class ProductController extends Controller
             'variants.*.price' => ['nullable', 'integer', 'min:0'],
             'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
 
-            if ($request->hasFile('images')) {
-                $i = ($product->images()->max('sort_order') ?? 0) + 1;
-                foreach ($request->file('images') as $img) {
-                    $path = $img->store('products', 'public');
-                    ProductImage::create([
-                        'product_id' => $product->id,
-                        'path' => $path,
-                        'image_path' => $path,
-                        'is_primary' => false,
-                        'sort_order' => $i++,
-                    ]);
-                }
-            }
-
-
         });
 
         return back()->with('success', 'Produk diperbarui.');
@@ -224,6 +209,7 @@ class ProductController extends Controller
         }
 
         $keepIds = [];
+
 
             $variant = null;
             if (!empty($row['id'])) {
