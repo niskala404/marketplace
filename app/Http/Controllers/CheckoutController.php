@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\FlashSaleItem;
 use App\Notifications\OrderPlacedNotification;
 use App\Notifications\OrderStatusChangedNotification;
+use App\Services\CartPricingService;
 use App\Services\ShippingCalculator;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
@@ -30,10 +31,10 @@ class CheckoutController extends Controller
         return '5-8 hari';
     }
 
-    public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
+    public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers, CartPricingService $pricing)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $this->sanitizeCheckoutItems($cart);
+
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -56,12 +57,7 @@ class CheckoutController extends Controller
 
         $groups = $items->groupBy(fn($it) => $it->product->shop_id);
 
-        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress) {
-            $shop = $groupItems->first()->product->shop;
 
-            $subtotal = $groupItems->sum(function ($it) {
-                $unit = (int) ($it->unit_price_snapshot ?? 0);
-                return $unit * (int) $it->qty;
             });
 
             $ship = $shipping->calculate($selectedAddress, $groupItems);
@@ -182,7 +178,7 @@ class CheckoutController extends Controller
         ]);
     }
 
-    public function place(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
+    public function place(Request $request, ShippingCalculator $shipping, VoucherService $vouchers, CartPricingService $pricing)
     {
         $request->validate([
             'address_id' => ['required','integer','exists:addresses,id'],
@@ -196,7 +192,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $this->sanitizeCheckoutItems($cart);
+
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -211,7 +207,7 @@ class CheckoutController extends Controller
             ->filter(fn($v) => $v !== '')
             ->all();
 
-        DB::transaction(function () use ($user, $items, $address, $groups, $request, $cart, $shipping, $vouchers, $platformVoucherCode, $shopVoucherCodes, $flashPriceMap) {
+        DB::transaction(function () use ($user, $items, $address, $groups, $request, $cart, $shipping, $vouchers, $platformVoucherCode, $shopVoucherCodes, $flashPriceMap, $pricing) {
 
             // cek stok final
             foreach ($items as $it) {
@@ -265,9 +261,7 @@ class CheckoutController extends Controller
             foreach ($groups as $shopId => $shopItems) {
                 $shopId = (int) $shopId;
 
-                $subtotal = (int) $shopItems->sum(function ($it) {
-                    $unit = (int) ($it->unit_price_snapshot ?? 0);
-                    return $unit * (int) $it->qty;
+
                 });
 
                 $options = $shipping->options($address, $shopItems);
@@ -404,7 +398,7 @@ class CheckoutController extends Controller
                 }
 
                 foreach ($shopItems as $it) {
-                    $unit = (int) ($it->unit_price_snapshot ?? 0);
+
 
                     OrderItem::create([
                         'order_id' => $order->id,
@@ -412,7 +406,7 @@ class CheckoutController extends Controller
                         'product_name' => $it->product->name,
                         'product_variant_id' => $it->variant?->id,
                         'variant_name' => $it->variant?->name,
-                        'sku' => $it->sku_snapshot ?: $it->variant?->sku,
+
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -568,61 +562,5 @@ class CheckoutController extends Controller
         return back()->with('success', 'Pesanan berhasil dibatalkan. Stok dikembalikan.');
     }
 
-    private function sanitizeCheckoutItems(Cart $cart)
-    {
-        $items = $cart->items()->with('product.shop', 'product.variants', 'variant')->get();
-        $invalidIds = [];
 
-        foreach ($items as $item) {
-            if (!$item->product || !$item->product->is_active) {
-                $invalidIds[] = $item->id;
-                continue;
-            }
-
-            if ($item->product_variant_id) {
-                if ($item->variant && !$item->sku_snapshot) {
-                    $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
-                }
-                if (!$item->unit_price_snapshot) {
-                    Log::warning('Checkout missing variant price snapshot; regenerating from variant price.', [
-                        'cart_item_id' => $item->id,
-                        'variant_id' => $item->product_variant_id,
-                    ]);
-                    $item->forceFill(['unit_price_snapshot' => (int)($item->variant?->price ?? 0)])->save();
-                }
-                if (
-                    !$item->variant
-                    || (int) $item->variant->product_id !== (int) $item->product_id
-                    || !$item->variant->is_active
-                    || ($item->sku_snapshot && $item->sku_snapshot !== $item->variant->sku)
-                ) {
-                    $invalidIds[] = $item->id;
-                }
-                continue;
-            }
-
-            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
-            if ($item->sku_snapshot !== $expectedBaseSku) {
-                $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
-            }
-            if (!$item->unit_price_snapshot) {
-                Log::warning('Checkout missing non-variant price snapshot; regenerating from product price.', [
-                    'cart_item_id' => $item->id,
-                    'product_id' => $item->product_id,
-                ]);
-                $item->forceFill(['unit_price_snapshot' => (int)$item->product->price])->save();
-            }
-
-            if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
-                $invalidIds[] = $item->id;
-            }
-        }
-
-        if ($invalidIds) {
-            $cart->items()->whereIn('id', $invalidIds)->delete();
-            return $cart->items()->with('product.shop', 'variant')->get();
-        }
-
-        return $items;
-    }
 }

@@ -176,7 +176,7 @@
                 class="variant-btn px-3 py-2 rounded-xl border bg-white text-sm"
                 data-id="{{ $variant->id }}"
                 data-name="{{ $variant->name }}"
-                data-sku="{{ $variant->sku }}"
+
                 data-price="{{ $variantPrice }}"
                 data-stock="{{ $variantStock }}"
               >
@@ -194,7 +194,7 @@
             @csrf
             <input type="hidden" name="qty" value="1">
             <input type="hidden" name="product_variant_id" class="variantInput">
-            <input type="hidden" name="sku" class="variantSkuInput">
+
             <button class="w-full px-4 py-3 rounded-2xl border font-black hover:bg-slate-50 inline-flex items-center justify-center gap-2">
               <x-ic name="shopping-cart" class="w-5 h-5 text-rose-600" />
               <span>Masukkan Keranjang</span>
@@ -205,7 +205,7 @@
             <input type="hidden" name="qty" value="1">
             <input type="hidden" name="buy_now" value="1">
             <input type="hidden" name="product_variant_id" class="variantInput">
-            <input type="hidden" name="sku" class="variantSkuInput">
+
             <button class="w-full px-4 py-3 rounded-2xl bg-rose-600 text-white font-black hover:bg-rose-700 shadow-sm inline-flex items-center justify-center gap-2">
               <x-ic name="zap" class="w-5 h-5" />
               <span>Beli Sekarang</span>
@@ -338,7 +338,7 @@
   const stockLabel = document.getElementById('stockLabel');
   const info = document.getElementById('variantInfo');
   const variantInputs = document.querySelectorAll('.variantInput');
-  const variantSkuInputs = document.querySelectorAll('.variantSkuInput');
+
   const forms = document.querySelectorAll('form[action*="/cart/add/"]');
   let selected = null;
 
@@ -348,7 +348,7 @@
       btn.classList.add('bg-rose-600','text-white','border-rose-600');
       selected = btn.dataset.id;
       variantInputs.forEach(i => i.value = selected);
-      variantSkuInputs.forEach(i => i.value = btn.dataset.sku || '');
+
       if(info) info.textContent = `Varian ${btn.dataset.name} dipilih • stok ${btn.dataset.stock}`;
       if(stockLabel) stockLabel.textContent = btn.dataset.stock;
       if(priceEl) priceEl.textContent = `Rp ${Number(btn.dataset.price).toLocaleString('id-ID')}`;

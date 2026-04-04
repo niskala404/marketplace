@@ -76,17 +76,13 @@
                 <button type="button" id="addVariantBtnEdit" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                <input id="variantOptionName1Edit" name="variant_options[0]" value="{{ $existingOptions[0] ?? '' }}" class="rounded-xl border-slate-200" placeholder="Nama opsi 1 (contoh: Warna)">
-                <input id="variantOptionValues1Edit" class="rounded-xl border-slate-200" placeholder="Nilai opsi 1 (Merah, Hitam)">
-                <input id="variantOptionName2Edit" name="variant_options[1]" value="{{ $existingOptions[1] ?? '' }}" class="rounded-xl border-slate-200" placeholder="Nama opsi 2 (contoh: Ukuran)">
+
                 <input id="variantOptionValues2Edit" class="rounded-xl border-slate-200" placeholder="Nilai opsi 2 (S, M, L)">
             </div>
             <button type="button" id="generateVariantsBtnEdit" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold mb-3">Generate Kombinasi Otomatis</button>
             <div id="variantRowsEdit" class="space-y-2">
                 @foreach($product->variants()->orderBy('id')->get() as $idx => $variant)
-                    @php
-                        $attrs = $variant->items()->with('option')->get()->mapWithKeys(fn($it) => [($it->option?->name ?? '') => $it->value])->filter()->all();
-                    @endphp
+
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white variant-edit-row">
                         <input type="hidden" name="variants[{{ $idx }}][id]" value="{{ $variant->id }}">
                         <input name="variants[{{ $idx }}][name]" value="{{ $variant->name }}" class="rounded-xl border-slate-200" placeholder="Nama varian (Merah / XL)">
@@ -96,7 +92,7 @@
                             <input type="number" min="0" name="variants[{{ $idx }}][stock]" value="{{ $variant->stock }}" class="rounded-xl border-slate-200 w-full" placeholder="Stok">
                             <button type="button" class="remove-variant px-3 rounded-xl border">✕</button>
                         </div>
-                        <input type="hidden" name="variants[{{ $idx }}][attributes]" value='@json($attrs)'>
+
                     </div>
                 @endforeach
             </div>
@@ -164,7 +160,7 @@
         <input type=\"number\" min=\"0\" name=\"variants[${idx}][stock]\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
         <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
       </div>
-      <input type=\"hidden\" name=\"variants[${idx}][attributes]\" value=''>
+
     `;
     rows.appendChild(wrap);
     idx++;
@@ -200,7 +196,7 @@
           <input type=\"number\" min=\"0\" name=\"variants[${idx}][stock]\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
           <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
         </div>
-        <input type=\"hidden\" name=\"variants[${idx}][attributes]\" value='${JSON.stringify((() => { const a = {}; a[name1]=combo[0]; if (vals2.length && name2) a[name2]=combo[1]; return a; })())}'>
+
       `;
       rows.appendChild(wrap);
       idx++;

@@ -26,19 +26,7 @@
           <div>
             <div class="text-sm font-semibold line-clamp-2">{{ $p->name }}</div>
             <div class="text-rose-600 font-bold">Rp {{ number_format($p->price,0,',','.') }}</div>
-            @auth
-              @if($p->variants->where('is_active', true)->isNotEmpty())
-                <a href="{{ route('product.show', $p->slug) }}" class="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-slate-900 text-white">Pilih Varian</a>
-              @else
-                <form method="POST" action="{{ route('cart.add', $p->id) }}" class="mt-1 js-live-add-cart">
-                  @csrf
-                  <input type="hidden" name="qty" value="1">
-                  <button class="text-xs px-2 py-1 rounded-full bg-rose-600 text-white">+ Keranjang</button>
-                </form>
-              @endif
-            @else
-              <span class="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-rose-600 text-white">Beli Sekarang</span>
-            @endauth
+
           </div>
         </a>
       @empty
@@ -47,48 +35,5 @@
     </div>
   </div>
 </div>
-@auth
-  <div class="fixed bottom-4 right-4 z-40">
-    <div class="flex flex-col gap-2">
-      @if(Route::has('messages.start'))
-        <form method="POST" action="{{ route('messages.start', $live->shop) }}">
-          @csrf
-          <button class="px-4 py-3 rounded-2xl bg-white border text-slate-900 font-bold shadow-lg w-full">Chat Penjual</button>
-        </form>
-      @endif
-      <a href="{{ route('cart.index') }}" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-bold shadow-lg text-center">Lihat Keranjang</a>
-    </div>
-  </div>
-@endauth
 
-<script>
-(function(){
-  const token = document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content');
-  document.querySelectorAll('.js-live-add-cart').forEach((form) => {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = form.querySelector('button[type=\"submit\"]');
-      btn?.setAttribute('disabled', 'disabled');
-      try{
-        const res = await fetch(form.action, {
-          method: 'POST',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json',
-            ...(token ? {'X-CSRF-TOKEN': token} : {}),
-          },
-          body: new FormData(form),
-        });
-        const json = await res.json().catch(() => ({}));
-        if(!res.ok){
-          alert(json.message || 'Gagal menambahkan produk ke keranjang.');
-          return;
-        }
-      }finally{
-        btn?.removeAttribute('disabled');
-      }
-    });
-  });
-})();
-</script>
 @endsection

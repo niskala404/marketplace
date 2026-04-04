@@ -60,7 +60,7 @@ Route::get('/search/suggest', SearchSuggestController::class)->name('search.sugg
 Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
 Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
-Route::get('/live/active.json', [LiveStreamController::class, 'active'])->name('live.active');
+
 Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
 
 // Report (public can submit, user_id nullable)

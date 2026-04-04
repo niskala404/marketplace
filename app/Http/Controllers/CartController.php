@@ -19,14 +19,12 @@ class CartController extends Controller
     public function index(Request $request, CartPricingService $pricing)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $this->sanitizeItems($cart);
+
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
         $flashPriceMap = FlashSaleItem::promoPriceMap($productIds);
 
-        $subtotal = $items->sum(function ($it) {
-            $unit = (int)($it->unit_price_snapshot ?? 0);
-            return $unit * (int) $it->qty;
+
         });
 
         return view('cart.index', compact('items','subtotal','flashPriceMap'));
@@ -35,32 +33,7 @@ class CartController extends Controller
 
     public function add(CartAddRequest $request, int $productId)
     {
-        $qty = (int)($request->input('qty', 1));
-        $buyNow = (bool) $request->boolean('buy_now');
-        $productVariantId = $request->input('product_variant_id');
-        $skuInput = trim((string) $request->input('sku', ''));
 
-        $product = Product::where('is_active', true)->findOrFail($productId);
-        $variant = null;
-        $skuSnapshot = 'PRODUCT-'.$product->id;
-        $availableStock = (int)$product->stock;
-        if ($product->variants()->exists()) {
-            if (!$productVariantId && $skuInput === '') {
-                return back()->with('error', 'Pilih varian produk terlebih dahulu.');
-            }
-
-            $variantQuery = ProductVariant::query()
-                ->where('product_id', $product->id)
-                ->where('is_active', true);
-
-            if ($productVariantId) {
-                $variantQuery->whereKey((int) $productVariantId);
-            } else {
-                $variantQuery->where('sku', $skuInput);
-            }
-
-            $variant = $variantQuery->firstOrFail();
-            $skuSnapshot = (string) $variant->sku;
 
             $availableStock = (int)$variant->stock;
         }
@@ -81,9 +54,7 @@ class CartController extends Controller
             'cart_id' => $cart->id,
             'product_id' => $product->id,
             'product_variant_id' => $variant?->id,
-        ], [
-            'sku_snapshot' => $skuSnapshot,
-            'unit_price_snapshot' => (int) $snapshotPrice,
+
         ]);
 
         $newQty = $item->qty + $qty;
@@ -97,7 +68,7 @@ class CartController extends Controller
         $item->update([
             'qty' => $newQty,
             'sku_snapshot' => $skuSnapshot,
-            'unit_price_snapshot' => $item->unit_price_snapshot ?: (int) $snapshotPrice,
+
         ]);
 
         if ($request->expectsJson()) {
@@ -118,6 +89,7 @@ class CartController extends Controller
 
     public function update(CartUpdateRequest $request, int $itemId)
     {
+
         $item = CartItem::with('product','cart','variant')->findOrFail($itemId);
         abort_if($item->cart->user_id !== $request->user()->id, 403);
 
@@ -153,10 +125,7 @@ class CartController extends Controller
                 if ($item->variant && !$item->sku_snapshot) {
                     $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
                 }
-                if (!$item->unit_price_snapshot) {
-                    Log::warning('Missing variant cart price snapshot, regenerating.', ['cart_item_id' => $item->id, 'variant_id' => $item->product_variant_id]);
-                    $item->forceFill(['unit_price_snapshot' => (int)($item->variant?->price ?? 0)])->save();
-                }
+
                 if (
                     !$item->variant
                     || (int) $item->variant->product_id !== (int) $item->product_id
@@ -172,10 +141,7 @@ class CartController extends Controller
             if ($item->sku_snapshot !== $expectedBaseSku) {
                 $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
             }
-            if (!$item->unit_price_snapshot) {
-                Log::warning('Missing non-variant cart price snapshot, regenerating.', ['cart_item_id' => $item->id, 'product_id' => $item->product_id]);
-                $item->forceFill(['unit_price_snapshot' => (int)$item->product->price])->save();
-            }
+
 
             if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
                 $invalidIds[] = $item->id;
