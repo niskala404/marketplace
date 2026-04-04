@@ -148,7 +148,15 @@
                 <?php $__currentLoopData = $order->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $it): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <div class="border rounded-2xl p-4">
                         <div class="flex items-center justify-between">
-                            <div class="text-sm font-semibold"><?php echo e($it->product_name); ?> × <?php echo e($it->qty); ?></div>
+                            <div class="text-sm font-semibold">
+                                <?php echo e($it->product_name); ?>
+
+                                <?php if($it->variant_name): ?>
+                                    <span class="text-xs text-slate-500">(<?php echo e($it->variant_name); ?>)</span>
+                                <?php endif; ?>
+                                × <?php echo e($it->qty); ?>
+
+                            </div>
                             <div class="font-black text-rose-600">Rp <?php echo e(number_format($it->line_total,0,',','.')); ?></div>
                         </div>
 
@@ -197,7 +205,16 @@
             <div class="text-slate-700">
                 <div class="font-semibold"><?php echo e($addr['recipient_name'] ?? '-'); ?> (<?php echo e($addr['phone'] ?? '-'); ?>)</div>
                 <div class="text-sm text-slate-600 mt-1"><?php echo e($addr['full_address'] ?? '-'); ?></div>
-                <div class="text-sm text-slate-500"><?php echo e($addr['district'] ?? ''); ?> <?php echo e($addr['city'] ?? ''); ?> <?php echo e($addr['province'] ?? ''); ?> <?php echo e($addr['postal_code'] ?? ''); ?></div>
+                <?php if(!empty($addr['detail_address'])): ?>
+                    <div class="text-sm text-slate-500 mt-1">Patokan: <?php echo e($addr['detail_address']); ?></div>
+                <?php endif; ?>
+                <div class="text-sm text-slate-500"><?php echo e($addr['village'] ?? ''); ?> <?php echo e($addr['district'] ?? ''); ?> <?php echo e($addr['city'] ?? ''); ?> <?php echo e($addr['province'] ?? ''); ?> <?php echo e($addr['postal_code'] ?? ''); ?></div>
+                <?php if(!empty($addr['latitude']) && !empty($addr['longitude'])): ?>
+                    <a target="_blank" rel="noopener" class="inline-block mt-2 text-sm text-rose-600 font-semibold hover:underline"
+                       href="https://www.google.com/maps?q=<?php echo e($addr['latitude']); ?>,<?php echo e($addr['longitude']); ?>">
+                        Lihat lokasi pengiriman
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
     </div>

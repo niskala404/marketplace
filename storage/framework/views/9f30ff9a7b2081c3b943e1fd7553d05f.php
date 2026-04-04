@@ -25,7 +25,16 @@
                         </div>
                         <div class="mt-1 text-slate-700 font-semibold"><?php echo e($a->recipient_name); ?> (<?php echo e($a->phone); ?>)</div>
                         <div class="text-sm text-slate-600 mt-1"><?php echo e($a->full_address); ?></div>
-                        <div class="text-sm text-slate-500"><?php echo e($a->district); ?> <?php echo e($a->city); ?> <?php echo e($a->province); ?> <?php echo e($a->postal_code); ?></div>
+                        <?php if($a->detail_address): ?>
+                            <div class="text-sm text-slate-500 mt-1">Patokan: <?php echo e($a->detail_address); ?></div>
+                        <?php endif; ?>
+                        <div class="text-sm text-slate-500"><?php echo e($a->village); ?> <?php echo e($a->district); ?> <?php echo e($a->city); ?> <?php echo e($a->province); ?> <?php echo e($a->postal_code); ?></div>
+                        <?php if($a->latitude && $a->longitude): ?>
+                            <a target="_blank" rel="noopener" class="inline-block mt-2 text-sm text-rose-600 font-semibold hover:underline"
+                               href="https://www.google.com/maps?q=<?php echo e($a->latitude); ?>,<?php echo e($a->longitude); ?>">
+                                Lihat titik lokasi
+                            </a>
+                        <?php endif; ?>
                     </div>
 
                     <div class="flex flex-col gap-2 w-40">

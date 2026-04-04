@@ -58,6 +58,7 @@ class CheckoutController extends Controller
         $groups = $items->groupBy(fn($it) => $it->product->shop_id);
 
 
+
             });
 
             $ship = $shipping->calculate($selectedAddress, $groupItems);
@@ -453,15 +454,21 @@ class CheckoutController extends Controller
         });
 
         if ($request->payment_method === 'midtrans') {
-            $pending = $user->orders()
+            $pendingOrders = $user->orders()
                 ->where('status', 'pending')
                 ->where('payment_method', 'midtrans')
+                ->whereNull('snap_token')
                 ->latest('id')
-                ->first();
+                ->get();
 
-            if ($pending) {
-                return redirect()->route('payments.midtrans.pay', $pending)
+            if ($pendingOrders->count() === 1) {
+                return redirect()->route('payments.midtrans.pay', $pendingOrders->first())
                     ->with('success', 'Pesanan dibuat. Silakan lanjut bayar.');
+            }
+
+            if ($pendingOrders->count() > 1) {
+                return redirect()->route('orders.mine')
+                    ->with('success', 'Pesanan dibuat untuk ' . $pendingOrders->count() . ' toko. Silakan bayar masing-masing pesanan.');
             }
         }
 
@@ -536,10 +543,7 @@ class CheckoutController extends Controller
 
             foreach ($locked->items as $item) {
                 Product::query()->whereKey($item->product_id)->increment('stock', (int)$item->qty);
-                if ($item->product_variant_id) {
-                    DB::table('product_variants')
-                        ->where('id', (int) $item->product_variant_id)
-                        ->increment('stock', (int) $item->qty);
+
                 }
             }
 

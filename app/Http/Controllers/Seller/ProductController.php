@@ -104,8 +104,12 @@ class ProductController extends Controller
 
         ]);
 
-        $slug = Str::slug($data['name']);
-        if (Product::where('slug', $slug)->exists()) $slug .= '-'.Str::random(5);
+        $baseSlug = Str::slug($data['name']);
+        $slug = $baseSlug;
+        $counter = 1;
+        while (Product::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $counter++;
+        }
 
         $product = null;
         DB::transaction(function () use ($request, $shopId, $data, $slug, &$product) {

@@ -18,13 +18,17 @@ class LiveStream extends Model
         'ended_at',
         'viewer_count',
         'chat_enabled',
+        'like_count',
+        'share_count',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
+        'started_at'   => 'datetime',
+        'ended_at'     => 'datetime',
         'viewer_count' => 'integer',
+        'like_count'   => 'integer',
+        'share_count'  => 'integer',
         'chat_enabled' => 'boolean',
     ];
 
@@ -38,5 +42,20 @@ class LiveStream extends Model
         return $this->belongsToMany(Product::class, 'live_stream_products')
             ->withPivot('sort_order')
             ->orderBy('live_stream_products.sort_order');
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(LiveStreamComment::class)->with('user')->latest()->limit(200);
+    }
+
+    public function likes()
+    {
+        return $this->hasMany(LiveStreamLike::class);
+    }
+
+    public function isLikedBy($userId): bool
+    {
+        return $this->likes()->where('user_id', $userId)->exists();
     }
 }

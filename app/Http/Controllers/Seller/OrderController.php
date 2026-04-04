@@ -8,20 +8,21 @@ use App\Notifications\OrderDeliveredNotification;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\OrderTrackingMilestoneService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
     public function index()
     {
         $shopId = auth()->user()->shop->id;
-        $orders = Order::where('shop_id',$shopId)->with('user')->latest()->paginate(10);
+        $orders = Order::where('shop_id', $shopId)->with('user')->latest()->paginate(10);
         return view('seller.orders.index', compact('orders'));
     }
 
     public function show(Order $order)
     {
         abort_if($order->shop_id !== auth()->user()->shop->id, 403);
-        $order->load(['items','shipmentEvents']);
+        $order->load(['items', 'shipmentEvents']);
         return view('seller.orders.show', compact('order'));
     }
 
@@ -30,84 +31,86 @@ class OrderController extends Controller
         abort_if($order->shop_id !== auth()->user()->shop->id, 403);
 
         $request->validate([
-            'status' => ['required','in:pending,paid,processing,shipped,completed,cancelled'],
-            'tracking_no' => ['nullable','string','max:80'],
+            'status'      => ['required', 'in:pending,paid,processing,shipped,completed,cancelled'],
+            'tracking_no' => ['nullable', 'string', 'max:80'],
         ]);
 
         $allowedTransitions = [
-            'pending' => ['paid', 'processing', 'cancelled'],
-            'paid' => ['processing', 'shipped', 'cancelled'],
+            'pending'    => ['paid', 'processing', 'cancelled'],
+            'paid'       => ['processing', 'shipped', 'cancelled'],
             'processing' => ['shipped', 'cancelled'],
-            'shipped' => ['completed'],
-            'completed' => [],
-            'cancelled' => [],
+            'shipped'    => ['completed'],
+            'completed'  => [],
+            'cancelled'  => [],
         ];
 
-        if ($request->status !== $order->status) {
-            $allowed = $allowedTransitions[$order->status] ?? [];
-            abort_if(!in_array($request->status, $allowed, true), 422, 'Transisi status tidak valid.');
-        }
-
-        $payload = ['status' => $request->status];
         $oldStatus = $order->status;
+        $newStatus = $request->status;
 
-        if ($request->status === 'shipped') {
-            if ($request->filled('tracking_no')) {
-                $payload['tracking_no'] = $request->tracking_no;
-                
+        DB::transaction(function () use ($order, $newStatus, $oldStatus, $allowedTransitions, $request, $trackingMilestones) {
+            $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->first();
+            if (!$locked) return;
+
+            if ($newStatus !== $locked->status) {
+                $allowed = $allowedTransitions[$locked->status] ?? [];
+                abort_if(!in_array($newStatus, $allowed, true), 422, 'Transisi status tidak valid.');
             }
-            $payload['shipped_at'] = now();
-        }
 
-        if ($request->status === 'paid' && !$order->paid_at) {
-            $payload['paid_at'] = now();
-        }
+            $payload = ['status' => $newStatus];
 
-        if ($request->status === 'completed' && !$order->completed_at) {
-            $payload['completed_at'] = now();
-            // if seller manually completes, consider received_at as now (MVP)
-            $payload['received_at'] = $payload['received_at'] ?? now();
-        }
-
-        $order->update($payload);
-
-        // shipment timeline events (Shopee-like tracking)
-        if ($oldStatus !== $order->status) {
-            if ($order->status === 'paid') {
-                $order->logShipmentEvent('paid', 'Pembayaran diterima', 'Pesanan akan segera diproses.');
+            if ($newStatus === 'shipped') {
+                if ($request->filled('tracking_no')) {
+                    $payload['tracking_no'] = $request->tracking_no;
+                }
+                $payload['shipped_at'] = now();
             }
-            if ($order->status === 'processing') {
-                $order->logShipmentEvent('processing', 'Pesanan diproses', 'Penjual sedang menyiapkan pesanan.');
-            }
-            if ($order->status === 'shipped') {
-                $trackingMilestones->seedShippedMilestones($order);
-            }
-            if ($order->status === 'completed') {
-                $order->logShipmentEvent('completed', 'Pesanan selesai', 'Dana diproses ke penjual.');
-            }
-            if ($order->status === 'cancelled') {
-                $order->logShipmentEvent('cancelled', 'Pesanan dibatalkan', $order->cancel_reason ?: null);
-            }
-        }
 
-        // settle commission when completed
-        if ($order->status === 'completed') {
-            $order->settleCommissionIfNeeded();
-        }
+            if ($newStatus === 'paid' && !$locked->paid_at) {
+                $payload['paid_at'] = now();
+            }
 
-        // notify buyer
-        $order->loadMissing('user');
+            if ($newStatus === 'completed' && !$locked->completed_at) {
+                $payload['completed_at'] = now();
+                $payload['received_at']  = $payload['received_at'] ?? now();
+            }
+
+            $locked->update($payload);
+
+            if ($oldStatus !== $locked->status) {
+                if ($locked->status === 'paid') {
+                    $locked->logShipmentEvent('paid', 'Pembayaran diterima', 'Pesanan akan segera diproses.');
+                }
+                if ($locked->status === 'processing') {
+                    $locked->logShipmentEvent('processing', 'Pesanan diproses', 'Penjual sedang menyiapkan pesanan.');
+                }
+                if ($locked->status === 'shipped') {
+                    $trackingMilestones->seedShippedMilestones($locked);
+                }
+                if ($locked->status === 'completed') {
+                    $locked->logShipmentEvent('completed', 'Pesanan selesai', 'Dana diproses ke penjual.');
+                }
+                if ($locked->status === 'cancelled') {
+                    $locked->logShipmentEvent('cancelled', 'Pesanan dibatalkan', $locked->cancel_reason ?: null);
+                }
+            }
+
+            if ($locked->status === 'completed') {
+                $locked->settleCommissionIfNeeded();
+            }
+        });
+
+        $order->refresh()->loadMissing('user');
         if ($order->user && $oldStatus !== $order->status) {
             $order->user->notify(new OrderStatusChangedNotification($order, $oldStatus, $order->status));
         }
-        return back()->with('success','Status order diperbarui.');
+
+        return back()->with('success', 'Status order diperbarui.');
     }
 
     public function markDelivered(Request $request, Order $order)
     {
         abort_if($order->shop_id !== auth()->user()->shop->id, 403);
 
-        // MVP: seller can mark delivered after shipped (for later courier integration)
         abort_if($order->status !== 'shipped', 422);
 
         if (!$order->delivered_at) {
@@ -115,7 +118,6 @@ class OrderController extends Controller
 
             $order->logShipmentEvent('delivered', 'Pesanan sampai', 'Paket sudah sampai di alamat tujuan.', now(), 'delivered');
 
-            // notify buyer about delivery milestone
             $order->loadMissing('user');
             if ($order->user) {
                 $order->user->notify(new OrderDeliveredNotification($order));
@@ -131,9 +133,9 @@ class OrderController extends Controller
         abort_if(!in_array($order->status, ['shipped', 'completed'], true), 422);
 
         $data = $request->validate([
-            'title' => ['required', 'string', 'max:120'],
+            'title'       => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'location' => ['required', 'string', 'max:160'],
+            'location'    => ['required', 'string', 'max:160'],
         ]);
 
         $order->logShipmentEvent(

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Notifications\OrderStatusChangedNotification;
 use App\Services\VoucherService;
 use Illuminate\Console\Command;
@@ -46,14 +47,20 @@ class CancelExpiredOrders extends Command
 
                     $old = $locked->status;
 
-                    // restore stock
+                    // restore product stock + variant stock
                     foreach ($locked->items as $item) {
                         Product::query()->whereKey($item->product_id)->increment('stock', (int) $item->qty);
+
+                        if ($item->product_variant_id) {
+                            ProductVariant::query()
+                                ->whereKey($item->product_variant_id)
+                                ->increment('stock', (int) $item->qty);
+                        }
                     }
 
                     $locked->forceFill([
-                        'status' => 'cancelled',
-                        'cancelled_at' => now(),
+                        'status'        => 'cancelled',
+                        'cancelled_at'  => now(),
                         'cancel_reason' => $locked->payment_method === 'midtrans' ? 'expired_payment' : 'expired_unpaid',
                     ])->save();
 

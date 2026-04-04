@@ -58,34 +58,39 @@ class PollOrderTracking extends Command
             return;
         }
 
-        $data = $res['data'] ?? [];
+        $data     = $res['data'] ?? [];
         $manifest = $data['manifest'] ?? [];
         $delivery = $data['delivery_status'] ?? [];
         $delivered = strtoupper((string) ($delivery['status'] ?? '')) === 'DELIVERED';
 
         DB::transaction(function () use ($order, $manifest, $delivered, $delivery) {
-            // insert new manifest entries only
             foreach ($manifest as $m) {
                 $title = (string) ($m['manifest_description'] ?? 'Update');
-                $desc = trim((string) (($m['city_name'] ?? '') . ' ' . ($m['manifest_code'] ?? '')));
-                $date = (string) ($m['manifest_date'] ?? '');
-                $time = (string) ($m['manifest_time'] ?? '00:00');
+                $desc  = trim((string) (($m['city_name'] ?? '') . ' ' . ($m['manifest_code'] ?? '')));
+                $date  = (string) ($m['manifest_date'] ?? '');
+                $time  = (string) ($m['manifest_time'] ?? '00:00');
+
                 $happenedAt = null;
                 if ($date !== '') {
-                    $happenedAt = now()->parse($date.' '.$time);
+                    $happenedAt = now()->parse($date . ' ' . $time);
                 }
+
+                // Dedup: pakai hash dari title + time + desc untuk hindari duplikat
+                // ketika kurir kirim 2 event berbeda pada waktu yang sama
+                $hashKey   = md5($title . '|' . ($happenedAt?->toIso8601String() ?? '') . '|' . $desc);
+                $eventCode = 'tracking_' . $hashKey;
 
                 $exists = ShipmentEvent::query()
                     ->where('order_id', $order->id)
-                    ->where('title', $title)
-                    ->where('happened_at', $happenedAt)
+                    ->where('event_code', $eventCode)
                     ->exists();
 
                 if (!$exists) {
                     ShipmentEvent::create([
-                        'order_id' => $order->id,
-                        'status' => 'tracking',
-                        'title' => $title,
+                        'order_id'   => $order->id,
+                        'status'     => 'tracking',
+                        'event_code' => $eventCode,
+                        'title'      => $title,
                         'description' => $desc,
                         'happened_at' => $happenedAt ?? now(),
                     ]);
@@ -95,10 +100,12 @@ class PollOrderTracking extends Command
             if ($delivered && !$order->delivered_at) {
                 $order->delivered_at = now();
                 $order->save();
+
                 ShipmentEvent::create([
-                    'order_id' => $order->id,
-                    'status' => 'delivered',
-                    'title' => 'Paket diterima kurir',
+                    'order_id'    => $order->id,
+                    'status'      => 'delivered',
+                    'event_code'  => 'delivered',
+                    'title'       => 'Paket diterima',
                     'description' => (string) ($delivery['pod_receiver'] ?? 'Delivered'),
                     'happened_at' => now(),
                 ]);

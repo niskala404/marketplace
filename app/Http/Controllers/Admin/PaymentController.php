@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Escrow;
 use App\Models\Order;
 use App\Notifications\PaymentVerifiedNotification;
 use App\Notifications\PaymentVerifiedSellerNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -36,31 +38,40 @@ class PaymentController extends Controller
             return back()->with('error', 'Belum ada bukti transfer.');
         }
 
-        $order->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-            'payment_verified_by' => $request->user()->id,
-            'payment_verified_at' => now(),
-        ]);
+        DB::transaction(function () use ($order, $request) {
+            $locked = Order::query()->whereKey($order->getKey())->lockForUpdate()->first();
 
-        // create escrow hold (money received)
-        $order->loadMissing('escrow');
-        if (!$order->escrow) {
-            \App\Models\Escrow::create([
-                'order_id' => $order->id,
-                'amount' => (int) ($order->grand_total ?? 0),
-                'status' => 'held',
-                'held_at' => now(),
-                'meta' => ['payment_method' => 'manual_transfer'],
+            if (!$locked || $locked->status !== 'pending') return;
+            if (!$locked->payment_proof_path) return;
+
+            $locked->update([
+                'status'               => 'paid',
+                'paid_at'              => now(),
+                'payment_verified_by'  => $request->user()->id,
+                'payment_verified_at'  => now(),
             ]);
-        }
 
-        $order->loadMissing(['user', 'shop.user']);
-        if ($order->user) {
-            $order->user->notify(new PaymentVerifiedNotification($order));
-        }
-        if ($order->shop?->user) {
-            $order->shop->user->notify(new PaymentVerifiedSellerNotification($order));
+            $locked->loadMissing('escrow');
+            if (!$locked->escrow) {
+                Escrow::create([
+                    'order_id' => $locked->id,
+                    'amount'   => (int) ($locked->grand_total ?? 0),
+                    'status'   => 'held',
+                    'held_at'  => now(),
+                    'meta'     => ['payment_method' => 'manual_transfer'],
+                ]);
+            }
+        });
+
+        $order->refresh()->loadMissing(['user', 'shop.user']);
+
+        if ($order->status === 'paid') {
+            if ($order->user) {
+                $order->user->notify(new PaymentVerifiedNotification($order));
+            }
+            if ($order->shop?->user) {
+                $order->shop->user->notify(new PaymentVerifiedSellerNotification($order));
+            }
         }
 
         return back()->with('success', 'Pembayaran diverifikasi. Pesanan menjadi PAID.');

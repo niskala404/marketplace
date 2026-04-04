@@ -88,11 +88,34 @@
         <div class="text-xs text-slate-500 mt-2">MVP: tombol ini untuk simulasi status “delivered” sebelum integrasi tracking kurir otomatis.</div>
     <?php endif; ?>
 
+    <?php if(in_array($order->status, ['shipped','completed'], true)): ?>
+        <div class="mt-5 p-4 rounded-2xl border bg-slate-50">
+            <div class="font-bold text-sm">Tambah Checkpoint Tracking</div>
+            <div class="text-xs text-slate-500 mt-1">Gunakan untuk update manual seperti “masuk DC Bandung”, “sedang diantar kurir”, dll.</div>
+
+            <form class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2" method="POST" action="<?php echo e(route('seller.orders.checkpoint', $order)); ?>">
+                <?php echo csrf_field(); ?>
+                <input name="title" class="rounded-xl border-slate-200" placeholder="Contoh: Masuk DC Bandung" required>
+                <input name="location" class="rounded-xl border-slate-200" placeholder="Lokasi checkpoint" required>
+                <input name="description" class="rounded-xl border-slate-200 md:col-span-3" placeholder="Keterangan tambahan (opsional)">
+                <button class="md:col-span-3 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold">Tambah Checkpoint</button>
+            </form>
+        </div>
+    <?php endif; ?>
+
     <div class="mt-6 font-bold">Items</div>
     <div class="mt-2 space-y-2">
         <?php $__currentLoopData = $order->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $it): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
             <div class="flex justify-between text-sm">
-                <div><?php echo e($it->product_name); ?> × <?php echo e($it->qty); ?></div>
+                <div>
+                    <?php echo e($it->product_name); ?>
+
+                    <?php if($it->variant_name): ?>
+                        <span class="text-xs text-slate-500">(<?php echo e($it->variant_name); ?>)</span>
+                    <?php endif; ?>
+                    × <?php echo e($it->qty); ?>
+
+                </div>
                 <div class="font-semibold">Rp <?php echo e(number_format($it->line_total,0,',','.')); ?></div>
             </div>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

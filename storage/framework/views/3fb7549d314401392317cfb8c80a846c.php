@@ -448,13 +448,40 @@
         </div>
       </div>
 
-      <div class="mt-2 text-slate-600 text-sm">Stok tersedia: <span class="font-bold"><?php echo e($product->stock); ?></span></div>
+      <div class="mt-2 text-slate-600 text-sm">Stok tersedia: <span class="font-bold" id="stockLabel"><?php echo e($product->stock); ?></span></div>
+
+      <?php if($product->variants->count()): ?>
+        <div class="mt-4 p-4 rounded-2xl border bg-slate-50">
+          <div class="font-semibold mb-2">Pilih Varian</div>
+          <div id="variantSelector" class="flex flex-wrap gap-2">
+            <?php $__currentLoopData = $product->variants->where('is_active', true); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $variant): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <?php
+                $variantPrice = (int)($variant->price ?? $product->price);
+                $variantStock = (int)$variant->stock;
+              ?>
+              <button
+                type="button"
+                class="variant-btn px-3 py-2 rounded-xl border bg-white text-sm"
+                data-id="<?php echo e($variant->id); ?>"
+                data-name="<?php echo e($variant->name); ?>"
+                data-price="<?php echo e($variantPrice); ?>"
+                data-stock="<?php echo e($variantStock); ?>"
+              >
+                <?php echo e($variant->name); ?>
+
+              </button>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </div>
+          <div id="variantInfo" class="mt-2 text-sm text-slate-600">Silakan pilih varian sebelum checkout.</div>
+        </div>
+      <?php endif; ?>
 
       <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <?php if(auth()->guard()->check()): ?>
           <form method="POST" action="<?php echo e(route('cart.add',$product->id)); ?>">
             <?php echo csrf_field(); ?>
             <input type="hidden" name="qty" value="1">
+            <input type="hidden" name="product_variant_id" class="variantInput">
             <button class="w-full px-4 py-3 rounded-2xl border font-black hover:bg-slate-50 inline-flex items-center justify-center gap-2">
               <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
@@ -483,6 +510,7 @@
             <?php echo csrf_field(); ?>
             <input type="hidden" name="qty" value="1">
             <input type="hidden" name="buy_now" value="1">
+            <input type="hidden" name="product_variant_id" class="variantInput">
             <button class="w-full px-4 py-3 rounded-2xl bg-rose-600 text-white font-black hover:bg-rose-700 shadow-sm inline-flex items-center justify-center gap-2">
               <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
@@ -747,6 +775,41 @@
 
 <script>
 (function(){
+  const buttons = document.querySelectorAll('.variant-btn');
+  if(!buttons.length) return;
+
+  const priceEl = document.querySelector('.text-3xl.font-black.text-rose-600');
+  const stockLabel = document.getElementById('stockLabel');
+  const info = document.getElementById('variantInfo');
+  const variantInputs = document.querySelectorAll('.variantInput');
+  const forms = document.querySelectorAll('form[action*="/cart/add/"]');
+  let selected = null;
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('bg-rose-600','text-white','border-rose-600'));
+      btn.classList.add('bg-rose-600','text-white','border-rose-600');
+      selected = btn.dataset.id;
+      variantInputs.forEach(i => i.value = selected);
+      if(info) info.textContent = `Varian ${btn.dataset.name} dipilih • stok ${btn.dataset.stock}`;
+      if(stockLabel) stockLabel.textContent = btn.dataset.stock;
+      if(priceEl) priceEl.textContent = `Rp ${Number(btn.dataset.price).toLocaleString('id-ID')}`;
+    });
+  });
+
+  forms.forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!selected) {
+        e.preventDefault();
+        alert('Silakan pilih varian produk terlebih dahulu.');
+      }
+    });
+  });
+})();
+</script>
+
+<script>
+(function(){
   const main = document.getElementById('mainImg');
   if(!main) return;
   document.querySelectorAll('.thumbBtn').forEach(btn => {
@@ -777,6 +840,5 @@
 })();
 </script>
 <?php $__env->stopSection(); ?>
-
 
 <?php echo $__env->make('layouts.market', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\laragon\www\ilmishop\resources\views/storefront/product.blade.php ENDPATH**/ ?>

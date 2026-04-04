@@ -66,6 +66,9 @@
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="font-extrabold line-clamp-2"><?php echo e($p->name); ?></div>
+                    <?php if($it->variant): ?>
+                      <div class="text-xs text-slate-500 mt-1">Varian: <span class="font-semibold"><?php echo e($it->variant->name); ?></span></div>
+                    <?php endif; ?>
                     <div class="text-sm text-slate-500 mt-0.5 inline-flex items-center gap-1">
                       <?php if (isset($component)) { $__componentOriginal16783dc90daf260581c0ddf14436b31a = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal16783dc90daf260581c0ddf14436b31a = $attributes; } ?>
