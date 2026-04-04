@@ -11,7 +11,7 @@ class ProductController extends Controller
 {
     public function show(string $slug)
     {
-        $product = Product::with(['shop.user','images','category','reviews.user'])
+        $product = Product::with(['shop.user','images','category','reviews.user', 'variants.items.option'])
             ->where('slug', $slug)
             ->where('is_active', true)
             ->where('approval_status', 'approved')

@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductVariant;
+use App\Models\ProductVariantItem;
+use App\Models\ProductVariantOption;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -92,34 +96,58 @@ class ProductController extends Controller
             'stock' => ['required','integer','min:0'],
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
+            'variants' => ['nullable', 'array'],
+            'variant_options' => ['nullable', 'array'],
+            'variant_options.*' => ['nullable', 'string', 'max:80'],
+            'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
+            'variants.*.sku' => ['nullable', 'string', 'max:60'],
+            'variants.*.price' => ['nullable', 'integer', 'min:0'],
+            'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
+            'variants.*.attributes' => ['nullable', 'string'],
         ]);
 
         $slug = Str::slug($data['name']);
         if (Product::where('slug', $slug)->exists()) $slug .= '-'.Str::random(5);
 
-        $product = Product::create([
-            'shop_id' => $shopId,
-            'category_id' => $data['category_id'] ?? null,
-            'name' => $data['name'],
-            'slug' => $slug,
-            'description' => $data['description'] ?? null,
-            'price' => $data['price'],
-            'discount_type' => $data['discount_type'] ?? 'none',
-            'discount_value' => (int)($data['discount_value'] ?? 0),
-            'weight_grams' => $data['weight_grams'],
-            'stock' => $data['stock'],
-            'is_active' => (bool)($data['is_active'] ?? true),
-            'approval_status' => 'pending',
-            'rejected_reason' => null,
-        ]);
+        $product = null;
+        DB::transaction(function () use ($request, $shopId, $data, $slug, &$product) {
+            $product = Product::create([
+                'shop_id' => $shopId,
+                'category_id' => $data['category_id'] ?? null,
+                'name' => $data['name'],
+                'slug' => $slug,
+                'description' => $data['description'] ?? null,
+                'price' => $data['price'],
+                'discount_type' => $data['discount_type'] ?? 'none',
+                'discount_value' => (int)($data['discount_value'] ?? 0),
+                'weight_grams' => $data['weight_grams'],
+                'stock' => $data['stock'],
+                'is_active' => (bool)($data['is_active'] ?? true),
+                'approval_status' => 'pending',
+                'rejected_reason' => null,
+            ]);
 
-        if ($request->hasFile('images')) {
-            $i = 0;
-            foreach ($request->file('images') as $img) {
-                $path = $img->store('products', 'public');
-                ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort_order' => $i++]);
+            if ($request->hasFile('images')) {
+                $i = 0;
+                foreach ($request->file('images') as $img) {
+                    $path = $img->store('products', 'public');
+                    ProductImage::create([
+                        'product_id' => $product->id,
+                        'path' => $path,
+                        'image_path' => $path,
+                        'is_primary' => $i === 0,
+                        'sort_order' => $i++,
+                    ]);
+                }
             }
-        }
+
+            $this->syncInlineVariants(
+                $product,
+                $data['variants'] ?? [],
+                $request->has('variants'),
+                $data['variant_options'] ?? []
+            );
+        });
 
         return redirect()->route('seller.products.index')->with('success', 'Produk dibuat.');
     }
@@ -147,30 +175,54 @@ class ProductController extends Controller
             'stock' => ['required','integer','min:0'],
             'is_active' => ['nullable','boolean'],
             'images.*' => ['nullable','image','max:2048'],
+            'variants' => ['nullable', 'array'],
+            'variant_options' => ['nullable', 'array'],
+            'variant_options.*' => ['nullable', 'string', 'max:80'],
+            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.name' => ['required_with:variants', 'string', 'max:120'],
+            'variants.*.sku' => ['nullable', 'string', 'max:60'],
+            'variants.*.price' => ['nullable', 'integer', 'min:0'],
+            'variants.*.stock' => ['required_with:variants', 'integer', 'min:0'],
+            'variants.*.attributes' => ['nullable', 'string'],
         ]);
 
-        $product->update([
-            'name' => $data['name'],
-            'category_id' => $data['category_id'] ?? null,
-            'description' => $data['description'] ?? null,
-            'price' => $data['price'],
-            'discount_type' => $data['discount_type'] ?? 'none',
-            'discount_value' => (int)($data['discount_value'] ?? 0),
-            'weight_grams' => $data['weight_grams'],
-            'stock' => $data['stock'],
-            'is_active' => (bool)($data['is_active'] ?? false),
-            // editing requires re-approval (marketplace style)
-            'approval_status' => 'pending',
-            'rejected_reason' => null,
-        ]);
+        DB::transaction(function () use ($request, $product, $data) {
+            $product->update([
+                'name' => $data['name'],
+                'category_id' => $data['category_id'] ?? null,
+                'description' => $data['description'] ?? null,
+                'price' => $data['price'],
+                'discount_type' => $data['discount_type'] ?? 'none',
+                'discount_value' => (int)($data['discount_value'] ?? 0),
+                'weight_grams' => $data['weight_grams'],
+                'stock' => $data['stock'],
+                'is_active' => (bool)($data['is_active'] ?? false),
+                // editing requires re-approval (marketplace style)
+                'approval_status' => 'pending',
+                'rejected_reason' => null,
+            ]);
 
-        if ($request->hasFile('images')) {
-            $i = ($product->images()->max('sort_order') ?? 0) + 1;
-            foreach ($request->file('images') as $img) {
-                $path = $img->store('products', 'public');
-                ProductImage::create(['product_id' => $product->id, 'path' => $path, 'sort_order' => $i++]);
+            if ($request->hasFile('images')) {
+                $i = ($product->images()->max('sort_order') ?? 0) + 1;
+                foreach ($request->file('images') as $img) {
+                    $path = $img->store('products', 'public');
+                    ProductImage::create([
+                        'product_id' => $product->id,
+                        'path' => $path,
+                        'image_path' => $path,
+                        'is_primary' => false,
+                        'sort_order' => $i++,
+                    ]);
+                }
             }
-        }
+
+            $this->syncInlineVariants(
+                $product,
+                $data['variants'] ?? [],
+                $request->has('variants'),
+                $data['variant_options'] ?? []
+            );
+        });
 
         return back()->with('success', 'Produk diperbarui.');
     }
@@ -186,5 +238,112 @@ class ProductController extends Controller
         $product->delete();
 
         return back()->with('success', 'Produk dihapus.');
+    }
+
+    private function syncInlineVariants(
+        Product $product,
+        array $variants,
+        bool $variantsPayloadExists = false,
+        array $variantOptions = []
+    ): void
+    {
+        $variants = collect($variants)
+            ->filter(fn ($row) => trim((string) ($row['name'] ?? '')) !== '')
+            ->values();
+
+        if ($variants->isEmpty()) {
+            if ($variantsPayloadExists) {
+                $product->variants()->delete();
+                $product->variantOptions()->delete();
+            }
+            return;
+        }
+
+        $keepIds = [];
+        $optionNames = collect($variantOptions)
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->values();
+
+        foreach ($variants as $row) {
+            $attrs = json_decode((string)($row['attributes'] ?? ''), true);
+            if (is_array($attrs)) {
+                foreach (array_keys($attrs) as $k) {
+                    $k = trim((string)$k);
+                    if ($k !== '' && !$optionNames->contains($k)) {
+                        $optionNames->push($k);
+                    }
+                }
+            }
+        }
+
+        $product->variantOptions()->delete();
+        $optionMap = [];
+        foreach ($optionNames->values() as $idx => $name) {
+            $opt = ProductVariantOption::create([
+                'product_id' => $product->id,
+                'name' => $name,
+                'sort_order' => $idx,
+            ]);
+            $optionMap[$name] = $opt;
+        }
+
+        foreach ($variants as $row) {
+            $baseSku = trim((string) ($row['sku'] ?? ''));
+            if ($baseSku !== '' && $variants->where('sku', $baseSku)->count() > 1) {
+                abort(422, "SKU varian duplikat di payload: {$baseSku}");
+            }
+
+            $variant = null;
+            if (!empty($row['id'])) {
+                $variant = ProductVariant::where('product_id', $product->id)->where('id', (int)$row['id'])->first();
+            }
+            if (!$variant) {
+                $variant = new ProductVariant(['product_id' => $product->id]);
+            }
+
+            $sku = trim((string) ($row['sku'] ?? ''));
+            if ($sku === '') {
+                $sku = 'SKU-'.Str::upper(Str::random(8));
+            }
+            while (
+                ProductVariant::query()
+                    ->where('sku', $sku)
+                    ->when($variant?->id, fn ($q) => $q->where('id', '!=', $variant->id))
+                    ->exists()
+            ) {
+                $sku = 'SKU-'.Str::upper(Str::random(8));
+            }
+            $variant->fill([
+                'name' => trim((string) $row['name']),
+                'sku' => $sku,
+                'price' => isset($row['price']) && $row['price'] !== '' ? (int) $row['price'] : null,
+                'stock' => (int) ($row['stock'] ?? 0),
+                'is_active' => true,
+            ]);
+            $variant->save();
+            $variant->items()->delete();
+
+            $attrs = json_decode((string)($row['attributes'] ?? ''), true);
+            if (is_array($attrs)) {
+                foreach ($attrs as $optionName => $value) {
+                    $optionName = trim((string) $optionName);
+                    $value = trim((string) $value);
+                    $option = $optionMap[$optionName] ?? null;
+                    if (!$option || $value === '') {
+                        continue;
+                    }
+                    ProductVariantItem::create([
+                        'product_variant_id' => $variant->id,
+                        'product_variant_option_id' => $option->id,
+                        'value' => $value,
+                    ]);
+                }
+            }
+            $keepIds[] = $variant->id;
+        }
+
+        $product->variants()->whereNotIn('id', $keepIds)->delete();
+        $product->update(['stock' => (int) $product->variants()->sum('stock')]);
     }
 }

@@ -22,6 +22,11 @@ class Shop extends Model
         return $this->hasMany(Conversation::class);
     }
 
+    public function liveStreams()
+    {
+        return $this->hasMany(LiveStream::class);
+    }
+
     public function payouts()
     {
         return $this->hasMany(Payout::class);

@@ -6,6 +6,7 @@ use App\Models\Banner;
 use App\Models\Category;
 use App\Models\FlashSale;
 use App\Models\FlashSaleItem;
+use App\Models\LiveStream;
 use App\Models\Product;
 use App\Models\ProductBoost;
 use Illuminate\Http\Request;
@@ -136,6 +137,11 @@ class StorefrontController extends Controller
 
         $products = $productsQuery->paginate(12)->withQueryString();
         $categories = Category::orderBy('name')->get();
+        $liveStreams = LiveStream::with('shop')
+            ->where('status', 'live')
+            ->latest('started_at')
+            ->limit(8)
+            ->get();
 
         /**
          * Infinite scroll / load more
@@ -167,7 +173,8 @@ class StorefrontController extends Controller
             'sort',
             'activeFlashSale',
             'flashItems',
-            'flashPriceMap'
+            'flashPriceMap',
+            'liveStreams'
         ));
     }
 }

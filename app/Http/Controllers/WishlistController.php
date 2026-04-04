@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\Product;
 use App\Models\WishlistItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class WishlistController extends Controller
 {
@@ -39,5 +42,137 @@ class WishlistController extends Controller
         ]);
 
         return back()->with('success', 'Ditambahkan ke wishlist.');
+    }
+
+    public function moveToCart(Request $request, Product $product)
+    {
+        $user = $request->user();
+
+        $wishlistItem = WishlistItem::where('user_id', $user->id)
+            ->where('product_id', $product->id)
+            ->first();
+
+        if (!$wishlistItem) {
+            return back()->with('error', 'Produk tidak ditemukan di wishlist.');
+        }
+
+        if (!$product->is_active || $product->stock < 1) {
+            return back()->with('error', 'Produk tidak tersedia atau stok habis.');
+        }
+
+        DB::transaction(function () use ($user, $product, $wishlistItem) {
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+            $variant = null;
+            $skuSnapshot = 'PRODUCT-'.$product->id;
+            $priceSnapshot = (int) $product->price;
+
+            if ($product->variants()->exists()) {
+                $variant = $product->variants()
+                    ->where('is_active', true)
+                    ->where('stock', '>', 0)
+                    ->orderBy('price')
+                    ->orderBy('id')
+                    ->first();
+
+                if (!$variant) {
+                    return;
+                }
+                $skuSnapshot = (string) $variant->sku;
+                $priceSnapshot = (int) ($variant->price ?? 0);
+            }
+
+            $cartItem = CartItem::firstOrCreate([
+                'cart_id' => $cart->id,
+                'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+            ], [
+                'sku_snapshot' => $skuSnapshot,
+                'unit_price_snapshot' => $priceSnapshot,
+                'qty' => 0,
+            ]);
+
+            $stockLimit = $variant ? (int) $variant->stock : (int) $product->stock;
+            if ($cartItem->qty < $stockLimit) {
+                $cartItem->update(['qty' => $cartItem->qty + 1]);
+                $wishlistItem->delete();
+            }
+        });
+
+        return back()->with('success', 'Produk dipindahkan ke keranjang.');
+    }
+
+    public function moveAllToCart(Request $request)
+    {
+        $user = $request->user();
+        $wishlistItems = WishlistItem::with('product')
+            ->where('user_id', $user->id)
+            ->get();
+
+        if ($wishlistItems->isEmpty()) {
+            return back()->with('error', 'Wishlist masih kosong.');
+        }
+
+        $moved = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($user, $wishlistItems, &$moved, &$skipped) {
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+
+            foreach ($wishlistItems as $wishlistItem) {
+                $product = $wishlistItem->product;
+                if (!$product || !$product->is_active || $product->stock < 1) {
+                    $skipped++;
+                    continue;
+                }
+                $variant = null;
+                $skuSnapshot = 'PRODUCT-'.$product->id;
+                $priceSnapshot = (int) $product->price;
+                if ($product->variants()->exists()) {
+                    $variant = $product->variants()
+                        ->where('is_active', true)
+                        ->where('stock', '>', 0)
+                        ->orderBy('price')
+                        ->orderBy('id')
+                        ->first();
+                    if (!$variant) {
+                        $skipped++;
+                        continue;
+                    }
+                    $skuSnapshot = (string) $variant->sku;
+                    $priceSnapshot = (int) ($variant->price ?? 0);
+                }
+
+                $cartItem = CartItem::firstOrCreate([
+                    'cart_id' => $cart->id,
+                    'product_id' => $product->id,
+                    'product_variant_id' => $variant?->id,
+                ], [
+                    'sku_snapshot' => $skuSnapshot,
+                    'unit_price_snapshot' => $priceSnapshot,
+                    'qty' => 0,
+                ]);
+
+                $stockLimit = $variant ? (int) $variant->stock : (int) $product->stock;
+                if ($cartItem->qty >= $stockLimit) {
+                    $skipped++;
+                    continue;
+                }
+
+                $cartItem->update(['qty' => $cartItem->qty + 1]);
+                $wishlistItem->delete();
+                $moved++;
+            }
+        });
+
+        if ($moved === 0) {
+            return back()->with('error', 'Tidak ada produk yang bisa dipindahkan ke keranjang.');
+        }
+
+        $message = "Berhasil memindahkan {$moved} produk ke keranjang.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} produk dilewati (stok habis/tidak aktif).";
+        }
+
+        return back()->with('success', $message);
     }
 }

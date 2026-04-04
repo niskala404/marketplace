@@ -16,6 +16,7 @@ use App\Services\ShippingCalculator;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CheckoutController extends Controller
@@ -32,7 +33,7 @@ class CheckoutController extends Controller
     public function show(Request $request, ShippingCalculator $shipping, VoucherService $vouchers)
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $this->sanitizeCheckoutItems($cart);
         if ($items->isEmpty()) return redirect()->route('cart.index')->with('error','Keranjang kosong.');
 
         $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
@@ -55,13 +56,12 @@ class CheckoutController extends Controller
 
         $groups = $items->groupBy(fn($it) => $it->product->shop_id);
 
-        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress, $flashPriceMap) {
+        $shopSummaries = $groups->map(function ($groupItems) use ($shipping, $selectedAddress) {
             $shop = $groupItems->first()->product->shop;
 
-            $subtotal = $groupItems->sum(function ($it) use ($flashPriceMap) {
-                $p = $it->product;
-                $unit = $flashPriceMap[$p->id] ?? (method_exists($p,'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
-                return $unit * (int)$it->qty;
+            $subtotal = $groupItems->sum(function ($it) {
+                $unit = (int) ($it->unit_price_snapshot ?? 0);
+                return $unit * (int) $it->qty;
             });
 
             $ship = $shipping->calculate($selectedAddress, $groupItems);
@@ -196,7 +196,7 @@ class CheckoutController extends Controller
         $user = $request->user();
 
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
-        $items = $cart->items()->with('product.shop')->get();
+        $items = $this->sanitizeCheckoutItems($cart);
         if ($items->isEmpty()) return back()->with('error','Keranjang kosong.');
 
         $address = $user->addresses()->where('id', $request->address_id)->firstOrFail();
@@ -215,7 +215,8 @@ class CheckoutController extends Controller
 
             // cek stok final
             foreach ($items as $it) {
-                if ((int)$it->product->stock < (int)$it->qty) {
+                $availableStock = $it->variant ? (int)$it->variant->stock : (int)$it->product->stock;
+                if ($availableStock < (int)$it->qty) {
                     abort(400, 'Stok berubah, silakan refresh.');
                 }
             }
@@ -251,8 +252,12 @@ class CheckoutController extends Controller
                 'province' => $address->province,
                 'city' => $address->city,
                 'district' => $address->district,
+                'village' => $address->village,
                 'postal_code' => $address->postal_code,
                 'full_address' => $address->full_address,
+                'detail_address' => $address->detail_address,
+                'latitude' => $address->latitude,
+                'longitude' => $address->longitude,
             ], JSON_UNESCAPED_UNICODE);
 
             // 1) Pre-calc per shop subtotal, shipping, and shop voucher
@@ -260,10 +265,9 @@ class CheckoutController extends Controller
             foreach ($groups as $shopId => $shopItems) {
                 $shopId = (int) $shopId;
 
-                $subtotal = (int) $shopItems->sum(function ($it) use ($flashPriceMap) {
-                    $p = $it->product;
-                    $unit = $flashPriceMap[$p->id] ?? (method_exists($p, 'discountedPrice') ? (int)$p->discountedPrice() : (int)$p->price);
-                    return $unit * (int)$it->qty;
+                $subtotal = (int) $shopItems->sum(function ($it) {
+                    $unit = (int) ($it->unit_price_snapshot ?? 0);
+                    return $unit * (int) $it->qty;
                 });
 
                 $options = $shipping->options($address, $shopItems);
@@ -365,6 +369,24 @@ class CheckoutController extends Controller
                     'shipping_address_snapshot' => $addressSnapshot,
                 ]);
 
+                $order->logShipmentEvent(
+                    'pending',
+                    'Pesanan dibuat',
+                    'Pesanan berhasil dibuat dan menunggu proses pembayaran.',
+                    now(),
+                    'order_created'
+                );
+
+                if ($order->status === 'processing') {
+                    $order->logShipmentEvent(
+                        'processing',
+                        'Pesanan diproses',
+                        'Pembayaran COD, pesanan langsung diproses penjual.',
+                        now(),
+                        'processing'
+                    );
+                }
+
                 // redeem shop voucher
                 if ($c['shopVoucherModel'] && (int)$c['shopDiscount'] > 0) {
                     $vouchers->redeem($c['shopVoucherModel'], $user->id, (int)$order->id, (int)$c['shopDiscount']);
@@ -382,13 +404,15 @@ class CheckoutController extends Controller
                 }
 
                 foreach ($shopItems as $it) {
-                    $unit = $flashPriceMap[$it->product->id]
-                        ?? (method_exists($it->product, 'discountedPrice') ? (int)$it->product->discountedPrice() : (int)$it->product->price);
+                    $unit = (int) ($it->unit_price_snapshot ?? 0);
 
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $it->product->id,
                         'product_name' => $it->product->name,
+                        'product_variant_id' => $it->variant?->id,
+                        'variant_name' => $it->variant?->name,
+                        'sku' => $it->sku_snapshot ?: $it->variant?->sku,
                         'price' => (int)$unit,
                         'qty' => (int)$it->qty,
                         'line_total' => ((int)$unit * (int)$it->qty),
@@ -401,6 +425,9 @@ class CheckoutController extends Controller
                     }
 
                     $it->product->decrement('stock', (int)$it->qty);
+                    if ($it->variant) {
+                        $it->variant->decrement('stock', (int)$it->qty);
+                    }
                 }
 
                 // auto thank-you message
@@ -456,7 +483,7 @@ class CheckoutController extends Controller
     public function showOrder(Request $request, Order $order)
     {
         abort_if($order->user_id !== $request->user()->id, 403);
-        $order->load(['shop', 'items.product', 'items.review', 'dispute']);
+        $order->load(['shop', 'items.product', 'items.review', 'dispute', 'shipmentEvents']);
         return view('orders.show', compact('order'));
     }
 
@@ -479,6 +506,8 @@ class CheckoutController extends Controller
                 'received_at' => $fresh->received_at ?: now(),
                 'completed_at' => $fresh->completed_at ?: now(),
             ])->save();
+            $fresh->logShipmentEvent('completed', 'Pesanan diterima pembeli', 'Pembeli sudah mengonfirmasi paket diterima.', now(), 'received');
+            $fresh->logShipmentEvent('completed', 'Pesanan selesai', 'Transaksi selesai dan dana diproses ke penjual.', now(), 'completed');
 
             $fresh->settleCommissionIfNeeded();
         });
@@ -513,6 +542,11 @@ class CheckoutController extends Controller
 
             foreach ($locked->items as $item) {
                 Product::query()->whereKey($item->product_id)->increment('stock', (int)$item->qty);
+                if ($item->product_variant_id) {
+                    DB::table('product_variants')
+                        ->where('id', (int) $item->product_variant_id)
+                        ->increment('stock', (int) $item->qty);
+                }
             }
 
             $vouchers->rollbackForOrder((int)$locked->id);
@@ -522,6 +556,7 @@ class CheckoutController extends Controller
                 'cancelled_at' => now(),
                 'cancel_reason' => 'buyer_cancelled',
             ])->save();
+            $locked->logShipmentEvent('cancelled', 'Pesanan dibatalkan pembeli', 'Pesanan dibatalkan sebelum pembayaran diverifikasi.', now(), 'cancelled');
         });
 
         $order->refresh()->loadMissing(['shop.user', 'user']);
@@ -531,5 +566,63 @@ class CheckoutController extends Controller
         }
 
         return back()->with('success', 'Pesanan berhasil dibatalkan. Stok dikembalikan.');
+    }
+
+    private function sanitizeCheckoutItems(Cart $cart)
+    {
+        $items = $cart->items()->with('product.shop', 'product.variants', 'variant')->get();
+        $invalidIds = [];
+
+        foreach ($items as $item) {
+            if (!$item->product || !$item->product->is_active) {
+                $invalidIds[] = $item->id;
+                continue;
+            }
+
+            if ($item->product_variant_id) {
+                if ($item->variant && !$item->sku_snapshot) {
+                    $item->forceFill(['sku_snapshot' => $item->variant->sku])->save();
+                }
+                if (!$item->unit_price_snapshot) {
+                    Log::warning('Checkout missing variant price snapshot; regenerating from variant price.', [
+                        'cart_item_id' => $item->id,
+                        'variant_id' => $item->product_variant_id,
+                    ]);
+                    $item->forceFill(['unit_price_snapshot' => (int)($item->variant?->price ?? 0)])->save();
+                }
+                if (
+                    !$item->variant
+                    || (int) $item->variant->product_id !== (int) $item->product_id
+                    || !$item->variant->is_active
+                    || ($item->sku_snapshot && $item->sku_snapshot !== $item->variant->sku)
+                ) {
+                    $invalidIds[] = $item->id;
+                }
+                continue;
+            }
+
+            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
+            if ($item->sku_snapshot !== $expectedBaseSku) {
+                $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
+            }
+            if (!$item->unit_price_snapshot) {
+                Log::warning('Checkout missing non-variant price snapshot; regenerating from product price.', [
+                    'cart_item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                ]);
+                $item->forceFill(['unit_price_snapshot' => (int)$item->product->price])->save();
+            }
+
+            if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
+                $invalidIds[] = $item->id;
+            }
+        }
+
+        if ($invalidIds) {
+            $cart->items()->whereIn('id', $invalidIds)->delete();
+            return $cart->items()->with('product.shop', 'variant')->get();
+        }
+
+        return $items;
     }
 }

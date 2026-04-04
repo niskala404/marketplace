@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name') }} - {{ $title ?? 'Marketplace' }}</title>
     @vite(['resources/css/app.css','resources/js/app.js'])
 
@@ -112,6 +113,12 @@
                 <a href="{{ route('wallet.index') }}" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Saldo" aria-label="Saldo">
                     <x-ic name="wallet" class="w-5 h-5" />
                 </a>
+
+                @if(auth()->user()->role === 'seller' && Route::has('seller.live.index'))
+                    <a href="{{ route('seller.live.index') }}" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Live Seller" aria-label="Live Seller">
+                        <x-ic name="video" class="w-5 h-5" />
+                    </a>
+                @endif
 
                 <a href="{{ route('account.profile') }}" class="px-3 py-2 rounded-2xl hover:bg-slate-100 active:scale-[0.98] transition" title="Akun" aria-label="Akun">
                     <x-ic name="user" class="w-5 h-5" />

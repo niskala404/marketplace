@@ -24,6 +24,11 @@ class ProductVariant extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function items()
+    {
+        return $this->hasMany(ProductVariantItem::class);
+    }
+
     public function effectivePrice(): int
     {
         return (int)($this->price ?? $this->product?->price ?? 0);

@@ -160,13 +160,41 @@
         </div>
       </div>
 
-      <div class="mt-2 text-slate-600 text-sm">Stok tersedia: <span class="font-bold">{{ $product->stock }}</span></div>
+      <div class="mt-2 text-slate-600 text-sm">Stok tersedia: <span class="font-bold" id="stockLabel">{{ $product->stock }}</span></div>
+
+      @if($product->variants->count())
+        <div class="mt-4 p-4 rounded-2xl border bg-slate-50">
+          <div class="font-semibold mb-2">Pilih Varian</div>
+          <div id="variantSelector" class="flex flex-wrap gap-2">
+            @foreach($product->variants->where('is_active', true) as $variant)
+              @php
+                $variantPrice = (int)($variant->price ?? $product->price);
+                $variantStock = (int)$variant->stock;
+              @endphp
+              <button
+                type="button"
+                class="variant-btn px-3 py-2 rounded-xl border bg-white text-sm"
+                data-id="{{ $variant->id }}"
+                data-name="{{ $variant->name }}"
+                data-sku="{{ $variant->sku }}"
+                data-price="{{ $variantPrice }}"
+                data-stock="{{ $variantStock }}"
+              >
+                {{ $variant->name }}
+              </button>
+            @endforeach
+          </div>
+          <div id="variantInfo" class="mt-2 text-sm text-slate-600">Silakan pilih varian sebelum checkout.</div>
+        </div>
+      @endif
 
       <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
         @auth
           <form method="POST" action="{{ route('cart.add',$product->id) }}">
             @csrf
             <input type="hidden" name="qty" value="1">
+            <input type="hidden" name="product_variant_id" class="variantInput">
+            <input type="hidden" name="sku" class="variantSkuInput">
             <button class="w-full px-4 py-3 rounded-2xl border font-black hover:bg-slate-50 inline-flex items-center justify-center gap-2">
               <x-ic name="shopping-cart" class="w-5 h-5 text-rose-600" />
               <span>Masukkan Keranjang</span>
@@ -176,6 +204,8 @@
             @csrf
             <input type="hidden" name="qty" value="1">
             <input type="hidden" name="buy_now" value="1">
+            <input type="hidden" name="product_variant_id" class="variantInput">
+            <input type="hidden" name="sku" class="variantSkuInput">
             <button class="w-full px-4 py-3 rounded-2xl bg-rose-600 text-white font-black hover:bg-rose-700 shadow-sm inline-flex items-center justify-center gap-2">
               <x-ic name="zap" class="w-5 h-5" />
               <span>Beli Sekarang</span>
@@ -301,6 +331,43 @@
 
 <script>
 (function(){
+  const buttons = document.querySelectorAll('.variant-btn');
+  if(!buttons.length) return;
+
+  const priceEl = document.querySelector('.text-3xl.font-black.text-rose-600');
+  const stockLabel = document.getElementById('stockLabel');
+  const info = document.getElementById('variantInfo');
+  const variantInputs = document.querySelectorAll('.variantInput');
+  const variantSkuInputs = document.querySelectorAll('.variantSkuInput');
+  const forms = document.querySelectorAll('form[action*="/cart/add/"]');
+  let selected = null;
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('bg-rose-600','text-white','border-rose-600'));
+      btn.classList.add('bg-rose-600','text-white','border-rose-600');
+      selected = btn.dataset.id;
+      variantInputs.forEach(i => i.value = selected);
+      variantSkuInputs.forEach(i => i.value = btn.dataset.sku || '');
+      if(info) info.textContent = `Varian ${btn.dataset.name} dipilih • stok ${btn.dataset.stock}`;
+      if(stockLabel) stockLabel.textContent = btn.dataset.stock;
+      if(priceEl) priceEl.textContent = `Rp ${Number(btn.dataset.price).toLocaleString('id-ID')}`;
+    });
+  });
+
+  forms.forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!selected) {
+        e.preventDefault();
+        alert('Silakan pilih varian produk terlebih dahulu.');
+      }
+    });
+  });
+})();
+</script>
+
+<script>
+(function(){
   const main = document.getElementById('mainImg');
   if(!main) return;
   document.querySelectorAll('.thumbBtn').forEach(btn => {
@@ -331,4 +398,3 @@
 })();
 </script>
 @endsection
-

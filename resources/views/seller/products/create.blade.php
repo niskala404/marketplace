@@ -83,9 +83,26 @@
             <textarea name="description" rows="4" class="w-full rounded-xl border-slate-200">{{ old('description') }}</textarea>
         </div>
 
+        <div class="border rounded-2xl p-4 bg-slate-50">
+            <div class="flex items-center justify-between mb-3">
+                <div class="font-bold">Varian Produk (Opsional)</div>
+                <button type="button" id="addVariantBtn" class="px-3 py-2 rounded-xl border text-sm font-semibold">+ Tambah Varian</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                <input id="variantOptionName1" name="variant_options[0]" class="rounded-xl border-slate-200" placeholder="Nama opsi 1 (contoh: Warna)">
+                <input id="variantOptionValues1" class="rounded-xl border-slate-200" placeholder="Nilai opsi 1 (Merah, Hitam)">
+                <input id="variantOptionName2" name="variant_options[1]" class="rounded-xl border-slate-200" placeholder="Nama opsi 2 (contoh: Ukuran)">
+                <input id="variantOptionValues2" class="rounded-xl border-slate-200" placeholder="Nilai opsi 2 (S, M, L)">
+            </div>
+            <button type="button" id="generateVariantsBtn" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold mb-3">Generate Kombinasi Otomatis</button>
+            <div id="variantRows" class="space-y-2"></div>
+            <div class="text-xs text-slate-500 mt-2">Jika produk punya ukuran/warna berbeda, tambahkan di sini agar langsung terkelola saat produk dibuat.</div>
+        </div>
+
         <div>
             <label class="font-semibold">Gambar (opsional, bisa banyak)</label>
-            <input type="file" name="images[]" multiple class="w-full">
+            <input type="file" id="imagesInput" name="images[]" multiple class="w-full" accept="image/*">
+            <div id="imagePreview" class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2"></div>
         </div>
 
         <label class="inline-flex items-center gap-2">
@@ -96,4 +113,84 @@
         <button class="w-full px-4 py-3 rounded-xl bg-rose-600 text-white font-black">Simpan</button>
     </form>
 </div>
+
+<script>
+(() => {
+  const addVariantBtn = document.getElementById('addVariantBtn');
+  const generateVariantsBtn = document.getElementById('generateVariantsBtn');
+  const variantRows = document.getElementById('variantRows');
+  let variantIdx = 0;
+
+  const addVariantRow = (row = {}) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-xl p-2 bg-white';
+    wrap.innerHTML = `
+      <input name=\"variants[${variantIdx}][name]\" value=\"${row.name || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"Nama varian (Merah / XL)\">
+      <input name=\"variants[${variantIdx}][sku]\" value=\"${row.sku || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"SKU (opsional)\">
+      <input type=\"number\" min=\"0\" name=\"variants[${variantIdx}][price]\" value=\"${row.price || ''}\" class=\"rounded-xl border-slate-200\" placeholder=\"Harga varian (opsional)\">
+      <div class=\"flex gap-2\">
+        <input type=\"number\" min=\"0\" name=\"variants[${variantIdx}][stock]\" value=\"${row.stock || ''}\" class=\"rounded-xl border-slate-200 w-full\" placeholder=\"Stok\">
+        <button type=\"button\" class=\"remove-variant px-3 rounded-xl border\">✕</button>
+      </div>
+      <input type=\"hidden\" name=\"variants[${variantIdx}][attributes]\" value='${row.attributes || ""}'>
+    `;
+    variantRows.appendChild(wrap);
+    wrap.querySelector('.remove-variant').addEventListener('click', () => wrap.remove());
+    variantIdx++;
+  };
+
+  addVariantBtn?.addEventListener('click', () => addVariantRow());
+
+  const cartesian = (arr) => arr.reduce((a, b) => a.flatMap(d => b.map(e => [...d, e])), [[]]);
+  generateVariantsBtn?.addEventListener('click', () => {
+    const name1 = document.getElementById('variantOptionName1')?.value?.trim();
+    const name2 = document.getElementById('variantOptionName2')?.value?.trim();
+    const vals1 = (document.getElementById('variantOptionValues1')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+    const vals2 = (document.getElementById('variantOptionValues2')?.value || '').split(',').map(v => v.trim()).filter(Boolean);
+
+    if (!name1 || !vals1.length) {
+      alert('Isi minimal opsi 1 dan nilainya untuk generate kombinasi.');
+      return;
+    }
+
+    variantRows.innerHTML = '';
+    variantIdx = 0;
+
+    const combos = vals2.length ? cartesian([vals1, vals2]) : vals1.map(v => [v]);
+    combos.forEach((combo) => {
+      const name = combo.join(' / ');
+      const attributes = {};
+      attributes[name1] = combo[0];
+      if (vals2.length && name2) attributes[name2] = combo[1];
+      addVariantRow({ name, attributes: JSON.stringify(attributes) });
+    });
+  });
+
+  const input = document.getElementById('imagesInput');
+  const preview = document.getElementById('imagePreview');
+  if (!input || !preview) return;
+
+  input.addEventListener('change', () => {
+    preview.innerHTML = '';
+    [...input.files].forEach((file, idx) => {
+      if (!file.type.startsWith('image/')) return;
+      const url = URL.createObjectURL(file);
+      const card = document.createElement('div');
+      card.className = 'relative border rounded-xl overflow-hidden';
+      card.innerHTML = `<img src=\"${url}\" class=\"w-full aspect-square object-cover\"><button type=\"button\" data-index=\"${idx}\" class=\"remove-image absolute top-1 right-1 bg-white/90 border rounded px-2\">✕</button>`;
+      preview.appendChild(card);
+    });
+
+    preview.querySelectorAll('.remove-image').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const removeIndex = Number(btn.dataset.index);
+        const dt = new DataTransfer();
+        [...input.files].forEach((f, i) => { if (i !== removeIndex) dt.items.add(f); });
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+      });
+    });
+  });
+})();
+</script>
 @endsection
