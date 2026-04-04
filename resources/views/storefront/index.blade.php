@@ -144,6 +144,34 @@
     </div>
   </x-ui.card>
 
+  {{-- Sedang Live --}}
+  <x-ui.card>
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="font-black text-lg">Sedang Live</div>
+        <div class="text-xs text-slate-500">Update otomatis tanpa refresh.</div>
+      </div>
+      <a href="{{ route('live.index') }}" class="text-sm font-bold text-rose-600 hover:underline">Lihat semua</a>
+    </div>
+    <div id="liveNowGrid" class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+      @forelse(($liveStreams ?? collect()) as $live)
+        <a href="{{ route('live.show', $live) }}" class="border rounded-xl overflow-hidden bg-white hover:shadow-sm">
+          <div class="aspect-video bg-slate-100">
+            @if($live->thumbnail_path)
+              <img src="{{ asset('storage/'.$live->thumbnail_path) }}" class="w-full h-full object-cover" alt="{{ $live->title }}">
+            @endif
+          </div>
+          <div class="p-2">
+            <div class="text-xs font-bold line-clamp-2">{{ $live->title }}</div>
+            <div class="text-[11px] text-slate-500">{{ $live->shop->name ?? '-' }}</div>
+          </div>
+        </a>
+      @empty
+        <div class="col-span-full text-sm text-slate-500">Belum ada live aktif saat ini.</div>
+      @endforelse
+    </div>
+  </x-ui.card>
+
   {{-- Voucher strip --}}
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
     <x-ui.card class="bg-gradient-to-r from-rose-50 to-white border-rose-200">
@@ -749,6 +777,35 @@
     });
   };
   bindQuickAdd(document);
+
+  // Live now auto-refresh
+  const liveGrid = document.getElementById('liveNowGrid');
+  const renderLiveNow = (rows) => {
+    if(!liveGrid) return;
+    if(!rows.length){
+      liveGrid.innerHTML = '<div class="col-span-full text-sm text-slate-500">Belum ada live aktif saat ini.</div>';
+      return;
+    }
+    liveGrid.innerHTML = rows.map((r) => `
+      <a href="${r.url}" class="border rounded-xl overflow-hidden bg-white hover:shadow-sm">
+        <div class="aspect-video bg-slate-100">${r.thumbnail_url ? `<img src="${r.thumbnail_url}" class="w-full h-full object-cover" alt="${r.title}">` : ''}</div>
+        <div class="p-2">
+          <div class="text-xs font-bold line-clamp-2">${r.title}</div>
+          <div class="text-[11px] text-slate-500">${r.shop_name ?? '-'}</div>
+        </div>
+      </a>
+    `).join('');
+  };
+  async function pollLiveNow(){
+    if(!liveGrid) return;
+    try{
+      const res = await fetch('{{ route('live.active') }}', {headers: {'Accept':'application/json'}});
+      if(!res.ok) return;
+      const json = await res.json();
+      renderLiveNow(Array.isArray(json.data) ? json.data : []);
+    }catch(e){}
+  }
+  setInterval(pollLiveNow, 8000);
 
   // Infinite scroll (optional; works only if backend supports nextPageUrl)
   const grid = document.getElementById('productsGrid');

@@ -40,20 +40,7 @@
       @endif
     </div>
 
-    {{-- Title + Actions --}}
-    <div class="bg-white border rounded-2xl p-4">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <h1 class="text-xl font-black line-clamp-2">{{ $live->title }}</h1>
-          <div class="flex items-center gap-2 mt-1 text-sm text-slate-500">
-            @if($live->shop->logo_path)
-              <img src="{{ asset('storage/'.$live->shop->logo_path) }}" class="w-5 h-5 rounded-full object-cover">
-            @endif
-            <span>{{ $live->shop->name }}</span>
-            @if($live->status === 'live')
-              <span class="text-slate-300">•</span>
-              <span class="text-rose-600 font-semibold text-xs">● LIVE</span>
-            @endif
+
           </div>
           @if($live->viewer_count)
             <div class="text-xs text-slate-400 mt-0.5">👁 {{ number_format($live->viewer_count,0,',','.') }} penonton</div>
@@ -141,115 +128,5 @@
 
 </div>
 
-@push('scripts')
-<script>
-(function(){
-  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
-  /* ---- Like ---- */
-  const likeBtn  = document.getElementById('likeBtn');
-  const likeIcon = document.getElementById('likeIcon');
-  const likeCount= document.getElementById('likeCount');
-
-  if(likeBtn){
-    likeBtn.addEventListener('click', async () => {
-      @auth
-        try{
-          const res = await fetch(likeBtn.dataset.url, {
-            method:'POST',
-            headers:{'X-CSRF-TOKEN':CSRF,'Accept':'application/json','Content-Type':'application/json'},
-          });
-          const data = await res.json();
-          likeIcon.textContent  = data.liked ? '❤️' : '🤍';
-          likeCount.textContent = Number(data.like_count).toLocaleString('id');
-          likeBtn.dataset.liked = data.liked ? '1' : '0';
-          likeBtn.classList.toggle('bg-rose-50', data.liked);
-          likeBtn.classList.toggle('border-rose-400', data.liked);
-          likeBtn.classList.toggle('text-rose-600', data.liked);
-        }catch(e){ console.error(e); }
-      @else
-        window.location.href = '{{ route("login") }}';
-      @endauth
-    });
-  }
-
-  /* ---- Share ---- */
-  const shareBtn = document.getElementById('shareBtn');
-  const shareCount = document.getElementById('shareCount');
-  if(shareBtn){
-    shareBtn.addEventListener('click', async () => {
-      const link = shareBtn.dataset.shareLink;
-      try{
-        if(navigator.share){
-          await navigator.share({ title: '{{ addslashes($live->title) }}', url: link });
-        } else {
-          await navigator.clipboard.writeText(link);
-          alert('Link live disalin! 📋');
-        }
-        // increment server
-        fetch(shareBtn.dataset.url, {
-          method:'POST',
-          headers:{'X-CSRF-TOKEN':CSRF,'Accept':'application/json'},
-        }).then(r=>r.json()).then(d=>{
-          shareCount.textContent = Number(d.share_count).toLocaleString('id');
-        });
-      }catch(e){ console.error(e); }
-    });
-  }
-
-  /* ---- Chat polling ---- */
-  const chatBox  = document.getElementById('chatBox');
-  const chatInput= document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-  const emptyMsg = document.getElementById('emptyChat');
-  let lastId = {{ $comments->last()->id ?? 0 }};
-
-  function appendComment(user, body){
-    if(emptyMsg) emptyMsg.remove();
-    const div = document.createElement('div');
-    div.className = 'flex gap-1.5 animate-[fadeIn_.3s_ease]';
-    div.innerHTML = `<span class="font-bold text-rose-600 shrink-0">${user}:</span><span class="text-slate-700 break-words">${body}</span>`;
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
-  }
-
-  // Poll every 3 seconds
-  async function pollComments(){
-    try{
-      const res  = await fetch(`{{ route('live.comments.poll', $live) }}?since=${lastId}`);
-      const data = await res.json();
-      data.forEach(c => {
-        if(c.id > lastId){ lastId = c.id; appendComment(c.user, c.body); }
-      });
-    }catch(e){}
-  }
-
-  @if($live->status === 'live')
-    setInterval(pollComments, 3000);
-  @endif
-
-  // Send comment
-  async function sendComment(){
-    const body = chatInput?.value?.trim();
-    if(!body) return;
-    chatInput.value = '';
-    try{
-      const res  = await fetch(chatSend.dataset.url, {
-        method:'POST',
-        headers:{'X-CSRF-TOKEN':CSRF,'Accept':'application/json','Content-Type':'application/json'},
-        body: JSON.stringify({ body }),
-      });
-      const data = await res.json();
-      if(data.id){ lastId = Math.max(lastId, data.id); appendComment(data.user, data.body); }
-    }catch(e){ console.error(e); }
-  }
-
-  chatSend?.addEventListener('click', sendComment);
-  chatInput?.addEventListener('keydown', e => { if(e.key === 'Enter') sendComment(); });
-
-  // Auto-scroll chat on load
-  if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-})();
-</script>
-@endpush
 @endsection

@@ -61,6 +61,7 @@ Route::get('/search/suggest', SearchSuggestController::class)->name('search.sugg
 Route::get('/p/{slug}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/shop/{slug}', [ShopController::class, 'show'])->name('shop.show');
 Route::get('/live', [LiveStreamController::class, 'index'])->name('live.index');
+
 Route::get('/live/{live}', [LiveStreamController::class, 'show'])->name('live.show');
 Route::get('/live/{live}/comments/poll', [LiveStreamController::class, 'pollComments'])->name('live.comments.poll');
 Route::post('/live/{live}/comment', [LiveStreamController::class, 'comment'])->middleware('auth')->name('live.comment');
@@ -73,7 +74,7 @@ Route::post('/report', [ReportController::class, 'store'])
     ->name('report.store');
 
 Route::middleware(['auth'])->group(function () {
-    // Affiliate
+
     Route::get('/affiliate', [AffiliateController::class, 'index'])->name('affiliate.index');
     Route::post('/affiliate/links', [AffiliateController::class, 'store'])->name('affiliate.links.store');
 
