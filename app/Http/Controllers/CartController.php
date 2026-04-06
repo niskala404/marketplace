@@ -20,22 +20,52 @@ class CartController extends Controller
     {
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
 
+        // ✅ FIX: $items was never assigned — sanitize cart items (removes invalid/inactive)
+        $items = $this->sanitizeItems($cart);
 
-        $productIds = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
+        $productIds    = $items->pluck('product_id')->map(fn($v) => (int)$v)->all();
         $flashPriceMap = FlashSaleItem::promoPriceMap($productIds);
 
-
+        // ✅ FIX: subtotal calculation was missing
+        $subtotal = (int) $items->sum(function ($it) use ($pricing, $flashPriceMap) {
+            $unit = $pricing->resolveUnitPrice($it->product, $it->variant, $flashPriceMap);
+            return $unit * (int) $it->qty;
         });
 
-        return view('cart.index', compact('items','subtotal','flashPriceMap'));
-
+        return view('cart.index', compact('items', 'subtotal', 'flashPriceMap'));
     }
 
     public function add(CartAddRequest $request, int $productId)
     {
+        // ✅ FIX: entire block was missing — product lookup, variant lookup, qty, buyNow, skuSnapshot
+        $product = Product::where('id', $productId)
+            ->where('is_active', true)
+            ->firstOrFail();
 
+        $qty    = max(1, (int) ($request->qty ?? 1));
+        $buyNow = (bool) ($request->buy_now ?? false);
 
-            $availableStock = (int)$variant->stock;
+        $variantId      = $request->product_variant_id;
+        $variant        = null;
+        $skuSnapshot    = 'PRODUCT-' . $product->id;
+        $availableStock = (int) $product->stock;
+
+        if ($variantId) {
+            $variant = ProductVariant::where('id', $variantId)
+                ->where('product_id', $product->id)
+                ->where('is_active', true)
+                ->firstOrFail();
+            $skuSnapshot    = $variant->sku;
+            $availableStock = (int) $variant->stock;
+        } else {
+            // Produk dengan varian tidak bisa ditambah tanpa memilih varian
+            if ($product->variants()->where('is_active', true)->exists()) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Silakan pilih varian produk terlebih dahulu.'], 422);
+                }
+                return redirect()->route('product.show', $product->slug)
+                    ->with('error', 'Silakan pilih varian produk terlebih dahulu.');
+            }
         }
 
         if ($availableStock < $qty) {
@@ -48,14 +78,20 @@ class CartController extends Controller
         $cart = Cart::firstOrCreate(['user_id' => $request->user()->id]);
 
         $flashPriceMap = FlashSaleItem::promoPriceMap([(int) $product->id]);
-        $snapshotPrice = $pricing->resolveUnitPrice($product, $variant, $flashPriceMap);
+        $snapshotPrice = app(CartPricingService::class)->resolveUnitPrice($product, $variant, $flashPriceMap);
 
-        $item = CartItem::firstOrCreate([
-            'cart_id' => $cart->id,
-            'product_id' => $product->id,
-            'product_variant_id' => $variant?->id,
-
-        ]);
+        $item = CartItem::firstOrCreate(
+            [
+                'cart_id'            => $cart->id,
+                'product_id'         => $product->id,
+                'product_variant_id' => $variant?->id,
+            ],
+            [
+                'qty'          => 0,
+                'sku_snapshot' => $skuSnapshot,
+                'unit_price'   => $snapshotPrice,
+            ]
+        );
 
         $newQty = $item->qty + $qty;
         if ($availableStock < $newQty) {
@@ -66,17 +102,17 @@ class CartController extends Controller
         }
 
         $item->update([
-            'qty' => $newQty,
+            'qty'          => $newQty,
             'sku_snapshot' => $skuSnapshot,
-
+            'unit_price'   => $snapshotPrice,
         ]);
 
         if ($request->expectsJson()) {
             $cartCount = (int) $cart->items()->sum('qty');
             return response()->json([
-                'message' => $buyNow ? 'Barang siap di-checkout.' : 'Berhasil ditambahkan ke keranjang.',
+                'message'    => $buyNow ? 'Barang siap di-checkout.' : 'Berhasil ditambahkan ke keranjang.',
                 'cart_count' => $cartCount,
-                'redirect' => $buyNow ? route('checkout.show') : null,
+                'redirect'   => $buyNow ? route('checkout.show') : null,
             ]);
         }
 
@@ -89,8 +125,7 @@ class CartController extends Controller
 
     public function update(CartUpdateRequest $request, int $itemId)
     {
-
-        $item = CartItem::with('product','cart','variant')->findOrFail($itemId);
+        $item = CartItem::with('product', 'cart', 'variant')->findOrFail($itemId);
         abort_if($item->cart->user_id !== $request->user()->id, 403);
 
         $availableStock = $item->variant ? (int)$item->variant->stock : (int)$item->product->stock;
@@ -112,7 +147,7 @@ class CartController extends Controller
 
     private function sanitizeItems(Cart $cart): Collection
     {
-        $items = $cart->items()->with('product.images', 'product.shop', 'product.variants', 'variant')->get();
+        $items      = $cart->items()->with('product.images', 'product.shop', 'product.variants', 'variant')->get();
         $invalidIds = [];
 
         foreach ($items as $item) {
@@ -137,11 +172,10 @@ class CartController extends Controller
                 continue;
             }
 
-            $expectedBaseSku = 'PRODUCT-'.$item->product_id;
+            $expectedBaseSku = 'PRODUCT-' . $item->product_id;
             if ($item->sku_snapshot !== $expectedBaseSku) {
                 $item->forceFill(['sku_snapshot' => $expectedBaseSku])->save();
             }
-
 
             if ($item->product->variants->where('is_active', true)->isNotEmpty()) {
                 $invalidIds[] = $item->id;

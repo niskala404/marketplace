@@ -66,11 +66,26 @@ class WishlistController extends Controller
             return back()->with('error', 'Produk tidak tersedia atau stok habis.');
         }
 
+        DB::transaction(function () use ($user, $product, $wishlistItem) {
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
+            $cartItem = CartItem::where('cart_id', $cart->id)
+                ->where('product_id', $product->id)
+                ->whereNull('product_variant_id')
+                ->first();
 
+            if ($cartItem) {
                 $cartItem->update(['qty' => $cartItem->qty + 1]);
-                $wishlistItem->delete();
+            } else {
+                CartItem::create([
+                    'cart_id'    => $cart->id,
+                    'product_id' => $product->id,
+                    'qty'        => 1,
+                    'unit_price' => $product->selling_price ?? $product->price,
+                ]);
             }
+
+            $wishlistItem->delete();
         });
 
         return back()->with('success', 'Produk dipindahkan ke keranjang.');
@@ -107,9 +122,19 @@ class WishlistController extends Controller
                     continue;
                 }
 
-                $cartItem = CartItem::firstOrCreate([
+                $cartItem = CartItem::firstOrCreate(
+                    [
+                        'cart_id'            => $cart->id,
+                        'product_id'         => $product->id,
+                        'product_variant_id' => null,
+                    ],
+                    [
+                        'qty'        => 0,
+                        'unit_price' => $product->selling_price ?? $product->price,
+                    ]
+                );
 
-
+                if ($cartItem->qty === 0 && !$cartItem->wasRecentlyCreated) {
                     $skipped++;
                     continue;
                 }

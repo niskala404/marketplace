@@ -362,11 +362,72 @@
         @endauth
     }
 
-    // cek awal dan lanjut polling
-    window.addEventListener('load', () => {
-        checkNotifications();
-        setInterval(checkNotifications, 10000);
-    });
+    // ✅ UPGRADED: Use SSE (EventSource) for real-time counter updates
+    // Falls back to polling if SSE is not available or connection fails.
+    @auth
+    (function () {
+        const SSE_URL = '{{ route("realtime.stream") }}';
+        const notifBadge = document.getElementById('notifBadge');
+        const msgBadge   = document.getElementById('msgBadge');
+
+        function applyCounters(data) {
+            const notifCount = Number(data.unread_notifications ?? 0);
+            const msgCount   = Number(data.unread_messages    ?? 0);
+
+            // Notification badge
+            if (notifBadge) {
+                if (notifCount > lastNotifCount) {
+                    const diff = notifCount - lastNotifCount;
+                    showNotifToast(
+                        'Notifikasi Baru',
+                        diff > 1 ? `Ada ${diff} notifikasi baru.` : 'Ada notifikasi baru untuk Anda.'
+                    );
+                    playNotifSound();
+                }
+                lastNotifCount = notifCount;
+                notifBadge.textContent = notifCount > 99 ? '99+' : notifCount;
+                notifBadge.classList.toggle('hidden', notifCount === 0);
+            }
+
+            // Message badge (if element exists)
+            if (msgBadge) {
+                msgBadge.textContent = msgCount > 99 ? '99+' : msgCount;
+                msgBadge.classList.toggle('hidden', msgCount === 0);
+            }
+        }
+
+        function connectSSE() {
+            const es = new EventSource(SSE_URL, { withCredentials: true });
+
+            es.addEventListener('counters', (e) => {
+                try { applyCounters(JSON.parse(e.data)); } catch (_) {}
+            });
+
+            // Server closes after 20 min → browser auto-reconnects (EventSource spec)
+            es.addEventListener('bye', () => es.close());
+
+            es.onerror = () => {
+                // EventSource auto-reconnects. If it keeps failing, fall back to polling.
+                es.close();
+                setTimeout(() => {
+                    checkNotifications();
+                    setInterval(checkNotifications, 15000); // slower polling as fallback
+                }, 5000);
+            };
+        }
+
+        // Connect on page load
+        window.addEventListener('load', () => {
+            // Small delay so layout render finishes first
+            setTimeout(connectSSE, 500);
+            // Also do one immediate check via the existing polling fn
+            checkNotifications();
+        });
+    })();
+    @else
+    // Not authenticated — just run a lightweight check on load
+    window.addEventListener('load', checkNotifications);
+    @endauth
 
     // ===== TOP LOADER =====
     const bar = document.getElementById('topLoader');
